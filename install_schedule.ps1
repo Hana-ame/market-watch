@@ -6,7 +6,7 @@
 $ErrorActionPreference = "Stop"
 $taskName = "MarketWatch-Refresh"
 $distro = "Ubuntu"
-$cmd = "/mnt/e/market-watch/update.sh"
+$cmd = "/mnt/e/market-watch/daily_guard.sh"
 
 $action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d $distro -e bash $cmd"
 $triggerOpen = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At "09:20"
@@ -14,7 +14,7 @@ $triggerClose = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wedn
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($triggerOpen, $triggerClose) `
-  -Description "Daily market snapshot refresh for /mnt/e/market-watch (09:20 / 15:10)" `
+  -Description "Local refresh + ensure GitHub Pages data is fresh for /mnt/e/market-watch (09:20 / 15:10)" `
   -Settings $settings -Force | Out-Null
 
 Write-Host "[ok] task registered: $taskName"

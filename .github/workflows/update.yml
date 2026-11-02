@@ -2,8 +2,9 @@ name: Refresh & deploy market-watch
 
 on:
   schedule:
-    # UTC；每 15 分钟尝试刷新并部署一次（GitHub 调度可能延迟 5–20 分钟）
-    - cron: "*/15 * * * *"
+    # UTC；每小时 :07 尝试刷新并部署（GitHub schedule 是 best-effort，可能延迟/合并）
+    # 机器开着时由本机看门狗补足到约每小时一次；见 README「在线更新保障」
+    - cron: "7 * * * *"
   workflow_dispatch:
   push:
     branches: [main]
