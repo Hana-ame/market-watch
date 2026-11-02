@@ -210,6 +210,8 @@ def fetch_boards():
         # 东财行业板块含二级/三级细分（如“游戏Ⅱ/游戏Ⅲ”），按去后缀后的名字去重
         return re.sub(r"[ⅠⅡⅢ]+$", "", str(name or "")).strip()
 
+    if not any(result.get(k) for k in result):
+        raise RuntimeError("boards empty")
     for k, rows in result.items():
         seen, uniq = set(), []
         want_bottom = k.endswith("bottom")
@@ -923,14 +925,17 @@ def main():
     trade_date = spark_dates[-1] if spark_dates else now.strftime("%Y-%m-%d")
 
     qtime = safe("quote_time", fetch_quote_time)
-    trading_today = bool(qtime and qtime.strftime("%Y-%m-%d") == now.strftime("%Y-%m-%d"))
+    # 拿不到报价时间时不判断休市（避免接口 502 把正常交易日误标成“今日不开市”）
+    trading_today = True if qtime is None else (qtime.strftime("%Y-%m-%d") == now.strftime("%Y-%m-%d"))
     state = market_state(now)
     if now.weekday() < 5 and not trading_today and now.time() >= dt.time(9, 30):
         state = "休市（今日不开市）"
 
     macro = safe("macro", fetch_macro)
     pools = safe("limit_pools", lambda: fetch_limit_pools(trade_date), {}) or {}
-    if not pools:
+    if (not pools) or (pools.get("limit_up", {}).get("count") is None
+                       and pools.get("limit_down", {}).get("count") is None
+                       and pools.get("zhaban", {}).get("count") is None):
         pools = {k: fb.get(k) for k in ("limit_up", "limit_down", "zhaban") if fb.get(k)}
     limit_up = pools.get("limit_up") or {"count": None, "items": [], "max_lbc": 0}
     limit_down = pools.get("limit_down") or {"count": None, "items": []}
