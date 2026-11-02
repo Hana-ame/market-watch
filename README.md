@@ -10,7 +10,19 @@
 - 仓库：https://github.com/Hana-ame/market-watch （PUBLIC）
 - GitHub Actions 每 15 分钟跑一次 `fetch_market.py`，把 `index.html` + 生成的 `data.js` 作为 Pages 产物部署；`data.js` 不入库（否则每 15 分钟一个提交会把仓库撑大）。
 - `data/history.json` 每个交易日只回写一次（要求已收盘、无降级、当日尚未记录），用于「近期节奏」多日累积。
-- 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；自选股批量报价已拆成两批 + 重试来降低概率。
+- 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；全市场分页已降到 6 并发 + 每页 4 次指数退避，自选股拆两批独立重试，最近一次 run 无降级。
+
+## 在线更新保障
+
+GitHub 的 `schedule` 是 best-effort（可能延迟 5–20 分钟，冷启动/高负载时更久），所以：
+
+1. **定时**：`*/15 * * * *`（UTC）触发 workflow；
+2. **手动/兜底**：workflow 支持 `repository_dispatch`，可随时触发一次：
+   ```sh
+   gh api -X POST repos/Hana-ame/market-watch/dispatches -f event_type=refresh
+   ```
+3. **本机看门狗**：`remote_watchdog.sh`（WSL cron 每 15 分钟）读取线上 `data.js` 的 `generated_ts`，超过 30 分钟未更新才 dispatch；线上正常时只做一次 curl，不产生重复构建。
+4. **push 触发**：改代码/文档推送 main 也会立即刷新并部署一次。
 
 ## 本地运行
 
