@@ -8,6 +8,7 @@ LOG="$DIR/data/update.log"
 LOCK="$DIR/.update.lock"
 
 mkdir -p "$DIR/data"
+export MARKET_HISTORY_PATH="$DIR/data/history.local.json"   # 本地历史与仓库历史分开，避免弄脏 git 工作区
 exec 9>"$LOCK"
 if ! flock -n 9; then
   echo "[skip] $(date '+%F %T') 已有刷新在跑" >>"$LOG"

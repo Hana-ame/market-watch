@@ -3,13 +3,26 @@
 本地运行的每日盯盘面板，**主看 XAUUSD 黄金、WTI/布伦特原油、USD/JPY 日元，并把三者折成人民币价**（元/克、元/桶、元/百日元）；另有「矿业期货」页签（有色 / 黑色 / 铁合金 / 新能源金属 / LME·COMEX 内外盘）和「A股盘面」页签（指数 / 涨跌宽度 / 板块 / 涨停梯队 / 自选股）。
 页面本身不联网：行情由脚本写进同目录 `data.js`，浏览器直接打开 `index.html` 即可。
 
-## 打开
+## 在线版（GitHub Pages）
+
+**https://hana-ame.github.io/market-watch/** — 手机/任何设备直接打开，不用开电脑。
+
+- 仓库：https://github.com/Hana-ame/market-watch （PUBLIC）
+- GitHub Actions 每 15 分钟跑一次 `fetch_market.py`，把 `index.html` + 生成的 `data.js` 作为 Pages 产物部署；`data.js` 不入库（否则每 15 分钟一个提交会把仓库撑大）。
+- `data/history.json` 只在每个交易日变化一次时才回写提交，用于「近期节奏」多日累积。
+- 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；自选股批量报价已拆成两批 + 重试来降低概率。
+
+## 本地运行
+
+上面的在线版不需要本机；想本地跑（Windows 双击打开、不依赖 GitHub）也行：
 
 ```
 E:\market-watch\index.html
 ```
 
 双击即可（Chrome / Edge）。页面每 60 秒自动重载一次 `data.js`，盘中无需手动刷新。
+
+本地运行会把历史写到 `data/history.local.json`（被测仓库忽略），与线上 `data/history.json` 分开，避免弄脏 git 工作区。
 
 ## 三个页签
 
@@ -55,7 +68,9 @@ E:\market-watch\index.html
 | `update.bat` | Windows 双击刷新（转调 WSL 的 update.sh） |
 | `install_schedule.ps1` / `uninstall_schedule.ps1` | 注册/卸载 Windows 计划任务 |
 | `data/update.log` | 最近 600 行运行日志 |
-| `data/history.json` | 按交易日累积的 A股上涨/下跌家数、成交额、情绪分 |
+| `data/history.json` | 线上用的按交易日累积历史（CI 每日回写）；本地运行写同目录 `history.local.json` |
+| `.github/workflows/update.yml` | GitHub Actions：每 15 分钟取数并部署 Pages |
+| `requirements.txt` | CI 依赖（requests） |
 | `data/snapshots/YYYY-MM-DD.json` | 当日完整快照，保留 90 天 |
 
 ## 改品种 / 自选股

@@ -26,6 +26,8 @@ import requests
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(ROOT, "data")
 SNAP_DIR = os.path.join(DATA_DIR, "snapshots")
+# 本地运行写 history.local.json（不进 git）；CI 用默认 history.json（每日回写仓库）
+HISTORY_PATH = os.environ.get("MARKET_HISTORY_PATH", os.path.join(DATA_DIR, "history.json"))
 TZ = dt.timezone(dt.timedelta(hours=8))
 HISTORY_KEEP = 120
 
@@ -938,7 +940,7 @@ def main():
         score = round(max(0, min(100, 100 * (0.4 * ratio + 0.3 * pool_ratio + 0.3 * (0.5 + med / 10)))))
 
     # 历史累积（按交易日）
-    hist_path = os.path.join(DATA_DIR, "history.json")
+    hist_path = HISTORY_PATH
     history = load_json(hist_path, [])
     if breadth and score is not None:
         entry = {
