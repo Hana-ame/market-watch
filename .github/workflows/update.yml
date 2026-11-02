@@ -2,9 +2,9 @@ name: Refresh & deploy market-watch
 
 on:
   schedule:
-    # UTC；每小时 :07 尝试刷新并部署（GitHub schedule 是 best-effort，可能延迟/合并）
-    # 机器开着时由本机看门狗补足到约每小时一次；见 README「在线更新保障」
-    - cron: "7 * * * *"
+    # UTC 15:10 = 北京时间 23:10；每天一次，取「A股收盘 + 国内夜盘 + 美盘早段」的当日快照
+    # GitHub schedule 为 best-effort，漏跑时由本机看门狗/Windows 任务 dispatch 兜底
+    - cron: "10 15 * * *"
   workflow_dispatch:
   push:
     branches: [main]

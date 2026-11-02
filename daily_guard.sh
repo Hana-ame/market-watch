@@ -5,4 +5,5 @@
 set -uo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash "$DIR/update.sh"
-bash "$DIR/remote_watchdog.sh"
+# 线上是每天 23:10 一次，所以只有超过 26 小时才补触发
+MAX_AGE=93600 bash "$DIR/remote_watchdog.sh"

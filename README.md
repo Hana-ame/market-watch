@@ -8,23 +8,23 @@
 **https://hana-ame.github.io/market-watch/** — 手机/任何设备直接打开，不用开电脑。
 
 - 仓库：https://github.com/Hana-ame/market-watch （PUBLIC）
-- GitHub Actions **每小时**跑一次 `fetch_market.py`（cron `7 * * * *`），把 `index.html` + 生成的 `data.js` 作为 Pages 产物部署；`data.js` 不入库（否则每个小时一个提交会把仓库撑大）。
+- GitHub Actions **每天一次**跑 `fetch_market.py`（cron `10 15 * * *` = 北京时间 23:10），把 `index.html` + 生成的 `data.js` 作为 Pages 产物部署；`data.js` 不入库。选 23:10 是为了同时包含 A股收盘、国内夜盘开盘和美盘早段。
 - `data/history.json` 每个交易日只回写一次（要求已收盘、无降级、当日尚未记录），用于「近期节奏」多日累积。
 - 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；全市场分页已降到 6 并发 + 每页 4 次指数退避，自选股拆两批独立重试，最近一次 run 无降级。
 
 ## 在线更新保障
 
-目标是**每小时更新一次**（用户口径：每日或每小时都可）。GitHub 的 `schedule` 是 best-effort（可能延迟、合并甚至长时间不触发），所以分两条腿：
+目标是**每天更新一次**（用户口径：每天）。GitHub 的 `schedule` 是 best-effort（可能延迟、合并甚至长时间不触发），所以仍有兜底：
 
-1. **定时**：`7 * * * *`（UTC，每小时 :07）触发 workflow；
+1. **定时**：`10 15 * * *`（UTC，即北京时间 23:10）触发 workflow；
 2. **手动/兜底**：workflow 支持 `repository_dispatch`，可随时触发一次：
    ```sh
    gh api -X POST repos/Hana-ame/market-watch/dispatches -f event_type=refresh
    ```
-3. **本机看门狗**：`remote_watchdog.sh`（WSL cron 每 30 分钟）读取线上 `data.js` 的 `generated_ts`，超过 65 分钟未更新才 dispatch；线上正常时只做一次 curl，不产生重复构建。
+3. **本机看门狗**：`remote_watchdog.sh`（WSL cron 每天 23:40）读取线上 `data.js` 的 `generated_ts`，超过 26 小时未更新才 dispatch；线上正常时只做一次 curl。
 3. **A股兜底快照**：CI 在「已收盘 + 无降级」时把 A股区块（指数/宽度/板块/涨停/自选）写入 `data/fallback.json` 并在每个交易日回写一次；若某次境外取数被东财 502，脚本用该快照填充 A股页，页头标注「N 个数据源降级」，主看板块（金/油/日元/矿业）不受影响。
 4. **push 触发**：改代码/文档推送 main 也会立即刷新并部署一次。
-5. **开机兜底**：Windows 计划任务 `MarketWatch-Refresh`（工作日 09:20 / 15:10）跑 `daily_guard.sh` = 本地刷新 + 线上看门狗，机器开着就至少每天两次把线上数据推新。
+5. **开机兜底**：Windows 计划任务 `MarketWatch-Refresh`（工作日 09:20 / 15:10）跑 `daily_guard.sh` = 本地刷新 + 线上看门狗（阈值 26h），漏跑时补一次。
 
 ## 本地运行
 
