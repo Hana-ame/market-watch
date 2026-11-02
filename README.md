@@ -3,16 +3,26 @@
 本地运行的每日盯盘面板，**主看 XAUUSD 黄金、WTI/布伦特原油、USD/JPY 日元，并把三者折成人民币价**（元/克、元/桶、元/百日元）；另有「矿业期货」页签（有色 / 黑色 / 铁合金 / 新能源金属 / LME·COMEX 内外盘）和「A股盘面」页签（指数 / 涨跌宽度 / 板块 / 涨停梯队 / 自选股）。
 页面本身不联网：行情由脚本写进同目录 `data.js`，浏览器直接打开 `index.html` 即可。
 
-## 在线版（GitHub Pages）
+## 在线访问（两个入口）
 
-**https://hana-ame.github.io/market-watch/** — 手机/任何设备直接打开，不用开电脑。
+**自建（主入口，推荐）：https://watch.moonchan.xyz/** — cloudcone 主机上的 nginx 静态站，服务器自己每天抓数，与中国行情接口同网，不受境外 runner 502 影响。
 
-- 仓库：https://github.com/Hana-ame/market-watch （PUBLIC）
+**GitHub Pages（备份）：https://hana-ame.github.io/market-watch/** — Actions 部署；境外 runner 偶发被东财 502，页面有 A股兜底快照。
+
+GitHub 仓库（代码镜像）：https://github.com/Hana-ame/market-watch （PUBLIC）
 - GitHub Actions **每天一次**跑 `fetch_market.py`（cron `10 15 * * *` = 北京时间 23:10），把 `index.html` + 生成的 `data.js` 作为 Pages 产物部署；`data.js` 不入库。选 23:10 是为了同时包含 A股收盘、国内夜盘开盘和美盘早段。
 - `data/history.json` 每个交易日只回写一次（要求已收盘、无降级、当日尚未记录），用于「近期节奏」多日累积。
 - 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；全市场分页已降到 6 并发 + 每页 4 次指数退避，自选股拆两批独立重试，最近一次 run 无降级。
 
-## 在线更新保障
+## 自建服务（当前主入口）
+
+- 主机：`cloudcone`（`117.55.237.217` / `cloudcone.moonchan.xyz`），站点目录 `/var/www/market-watch`。
+- nginx：`/etc/nginx/sites-enabled/watch-moonchan.conf`，`watch.moonchan.xyz` 直接对源站（Cloudflare DNS-only），TLS 复用 `*.moonchan.xyz` 泛域名证书，HTTP 自动 301 到 HTTPS。
+- 定时：systemd `market-watch.timer`，`OnCalendar=*-*-* 23:10:00 Asia/Shanghai`（`Persistent=true`，关机错过会补跑）→ `market-watch.service` 执行 `/var/www/market-watch/update.sh`。
+- 手动刷新：`ssh cloudcone 'systemctl start market-watch'`；页面数据在 `/var/www/market-watch/data.js`，页面每 60 秒自动重载。
+- 部署方式：把 `index.html` / `data.js` / `fetch_market.py` / `update.sh` 传到 `/var/www/market-watch` 即可；服务器已装 Python 3.11 + requests。
+
+## GitHub Pages 更新保障（备份链路）
 
 目标是**每天更新一次**（用户口径：每天）。GitHub 的 `schedule` 是 best-effort（可能延迟、合并甚至长时间不触发），所以仍有兜底：
 
