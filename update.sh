@@ -19,6 +19,7 @@ fi
 start=$(date +%s)
 printf '\n[run ] %s\n' "$(date '+%F %T')" >>"$LOG"
 python3 "$DIR/fetch_market.py" >>"$LOG" 2>&1
+python3 "$DIR/fetch_history.py" --if-stale 20 >>"$LOG" 2>&1 || echo "[warn] fetch_history 失败（沿用旧 rates.js）" >>"$LOG"
 rc=$?
 printf '[done] rc=%s %ss\n' "$rc" "$(( $(date +%s) - start ))" >>"$LOG"
 

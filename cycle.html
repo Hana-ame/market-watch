@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>历史利率 × 经济周期</title>
+<style>
+  :root{
+    --bg:#070a0f; --panel:#0d141d; --panel-2:#111a25; --line:#1b2836; --line-2:#243546;
+    --text:#e7eef6; --muted:#8496a9; --dim:#5b6b7d;
+    --up:#ff4d5e; --down:#0ecb81; --gold:#f0b429; --blue:#4c8dff; --red:#ff5d6c; --violet:#a97bff;
+    --mono:"JetBrains Mono","SFMono-Regular","Cascadia Mono",Consolas,monospace;
+    --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{margin:0;padding:0}
+  body{background:
+      radial-gradient(1100px 520px at 12% -8%,rgba(240,180,41,.09),transparent 62%),
+      radial-gradient(900px 420px at 92% -6%,rgba(76,141,255,.08),transparent 60%),
+      var(--bg);
+    color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1480px;margin:0 auto;padding:22px 24px 44px}
+  .muted{color:var(--muted)} .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .up{color:var(--up)} .down{color:var(--down)}
+
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .mark{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;
+    background:linear-gradient(145deg,#2a2415,#121417);border:1px solid #3d3420;color:var(--gold);font-size:20px;font-weight:700}
+  h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.5px;display:flex;align-items:baseline;gap:10px}
+  h1 .ver{font-size:11px;color:var(--dim);font-weight:400;letter-spacing:1px}
+  .meta-line{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .back{font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--line-2);border-radius:8px;padding:6px 12px}
+  .back:hover{color:#fff;border-color:#3a5573}
+
+  .summary{border:1px solid var(--line);border-left:3px solid var(--gold);
+    background:linear-gradient(90deg,rgba(240,180,41,.07),rgba(13,20,29,.85) 42%);
+    border-radius:12px;padding:13px 18px;margin-bottom:14px;font-size:13.5px;line-height:1.8;color:#cbd8e6}
+  .summary b{color:#fff}
+
+  .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+  .stat{background:linear-gradient(180deg,#101923,#0c1219);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat .k{font-size:11px;color:var(--dim);letter-spacing:.5px}
+  .stat .v{font-family:var(--mono);font-size:22px;margin-top:4px;color:#fff;line-height:1.2}
+  .stat .s{font-size:11px;color:var(--muted);margin-top:2px}
+
+  .panel{background:linear-gradient(180deg,var(--panel),#0b1118);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+  .panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .panel-t{font-size:13px;font-weight:600;letter-spacing:.8px;color:#b9c8d8;display:flex;align-items:center;gap:8px}
+  .panel-t::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--gold);display:inline-block}
+  .panel-sub{font-size:11px;color:var(--dim);font-family:var(--mono)}
+
+  .chart-wrap{position:relative}
+  .chart-wrap svg{width:100%;height:auto;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .legend .li{display:flex;align-items:center;gap:6px}
+  .legend .li i{width:14px;height:3px;border-radius:2px;display:inline-block}
+  .tooltip{position:absolute;pointer-events:none;background:#0d1622;border:1px solid #2a3d54;border-radius:9px;
+    padding:8px 10px;font-size:11.5px;font-family:var(--mono);color:#cfdae7;box-shadow:0 8px 24px rgba(0,0,0,.5);
+    min-width:150px;z-index:5;white-space:nowrap}
+  .tooltip b{color:#fff;font-family:var(--sans);font-size:10.5px;letter-spacing:.5px}
+  .tooltip .r{display:flex;justify-content:space-between;gap:14px}
+
+  .grid-2{display:grid;grid-template-columns:1.5fr 1fr;gap:12px}
+  .grid-2 > .panel{margin-bottom:0}
+
+  .findings{list-style:none;margin:0;padding:0}
+  .findings li{padding:9px 0;border-bottom:1px dashed rgba(27,40,54,.8);font-size:13px;line-height:1.7}
+  .findings li:last-child{border-bottom:none}
+  .findings .n{font-family:var(--mono);color:var(--gold);margin-right:6px;font-size:11.5px}
+  .findings b{color:#fff}
+
+  table.t{width:100%;border-collapse:collapse;font-size:12px}
+  table.t th{text-align:right;font-size:10.5px;color:var(--dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table.t th:first-child,table.t td:first-child{text-align:left;padding-left:2px}
+  table.t td{text-align:right;padding:6px 8px;border-bottom:1px dashed rgba(27,40,54,.7);font-family:var(--mono);white-space:nowrap}
+  table.t tr:last-child td{border-bottom:none}
+  table.t tr:hover td{background:#0f1822}
+  table.t td.nm{font-family:var(--sans);color:#c9d6e4}
+
+  .foot{font-size:11px;color:var(--dim);line-height:1.9;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .foot a{color:#8aa4c8}
+  .err{border:1px solid #3a2c18;background:#120f0a;color:#d9c7a8;border-radius:10px;padding:16px 18px;font-size:13px;margin-bottom:12px}
+
+  @media (max-width:1080px){
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-2{grid-template-columns:1fr}
+  }
+  @media (max-width:640px){
+    .wrap{padding:14px 12px 30px}
+    table.t{font-size:10.5px}
+    table.t th,table.t td{padding:5px 4px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">利</div>
+      <div>
+        <h1>历史利率 × 经济周期<span class="ver">1954–2026 · FRED</span></h1>
+        <div class="meta-line">
+          <span id="asOf">—</span><span>·</span>
+          <span class="muted">联邦基金利率 / 实际利率 / 10Y / 期限利差 / CPI / NBER 衰退</span>
+        </div>
+      </div>
+    </div>
+    <a class="back" href="./index.html">← 回每日看盘</a>
+  </header>
+
+  <div id="loadErr" class="err" hidden>历史数据 <code>rates.js</code> 没有加载成功。请运行 <code>python3 fetch_history.py</code>（或等 update.sh 自动生成）后刷新。</div>
+
+  <div class="summary" id="summary">正在加载历史数据…</div>
+  <div class="stats" id="stats"></div>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">利率 vs 经济周期（1954–2026）</div>
+      <div class="panel-sub" id="chartSub">—</div>
+    </div>
+    <div class="chart-wrap" id="chartA"></div>
+    <div class="legend">
+      <span class="li"><i style="background:#f0b429"></i>联邦基金有效利率（月均）</span>
+      <span class="li"><i style="background:#ff5d6c"></i>实际利率 = FFR − CPI 同比</span>
+      <span class="li"><i style="background:#4c8dff"></i>10 年期美债收益率</span>
+      <span class="li"><i style="background:rgba(140,150,170,.35)"></i>NBER 衰退</span>
+      <span class="li"><i style="background:rgba(169,123,255,.5)"></i>曲线倒挂</span>
+    </div>
+    <div class="panel-sub" style="margin-top:8px">鼠标移到图上可看逐月读数；下方细条为 10Y-3M 利差 &lt; 0（倒挂）的月份。</div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">期限利差（10Y − 3M）与衰退</div>
+      <div class="panel-sub" id="slopeSub">—</div>
+    </div>
+    <div class="chart-wrap" id="chartB"></div>
+    <div class="legend">
+      <span class="li"><i style="background:#a97bff"></i>10Y-3M 利差</span>
+      <span class="li"><i style="background:rgba(169,123,255,.18)"></i>倒挂区间</span>
+      <span class="li"><i style="background:rgba(140,150,170,.35)"></i>NBER 衰退</span>
+    </div>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-h"><div class="panel-t">共同点（按数据算的）</div></div>
+      <ul class="findings" id="findings"></ul>
+    </section>
+    <section class="panel">
+      <div class="panel-h"><div class="panel-t">当前周期位置</div><div class="panel-sub" id="curSub">—</div></div>
+      <ul class="findings" id="currentBox"></ul>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">逐轮衰退对照</div>
+      <div class="panel-sub">FFR 峰值取衰退前 36 个月内最高月均；倒挂取衰退前 36 个月内首次 10Y−3M &lt; 0</div>
+    </div>
+    <div style="overflow-x:auto"><table class="t" id="cycleTable"></table></div>
+  </section>
+
+  <div class="foot">
+    数据：<a href="https://fred.stlouisfed.org/series/FEDFUNDS">FRED FEDFUNDS</a>、<a href="https://fred.stlouisfed.org/series/DGS10">DGS10</a>、
+    <a href="https://fred.stlouisfed.org/series/T10Y3M">T10Y3M</a>、<a href="https://fred.stlouisfed.org/series/CPIAUCSL">CPIAUCSL</a>、
+    <a href="https://fred.stlouisfed.org/series/USREC">USREC</a>（NBER 衰退，1=衰退）。<br>
+    口径：利率取月度均值；实际利率 = 联邦基金有效利率 − CPI 同比；期限利差 10Y−3M 负值为倒挂。T10Y3M 自 1982 年起，之前衰退无法判倒挂。
+    NBER 衰退为事后判定、公布有滞后；本页只做历史对照，不构成预测或投资建议。数据生成 <span id="genAt">—</span>。
+  </div>
+</div>
+
+<script src="rates.js"></script>
+<script>
+(function(){
+  "use strict";
+  var R = window.RATES;
+  if(!R){ document.getElementById('loadErr').hidden = false; document.getElementById('summary').textContent = "数据缺失"; return; }
+  var $ = function(id){ return document.getElementById(id); };
+
+  function fmt(v, d){ if(v===null||v===undefined||isNaN(v)) return "—"; return Number(v).toFixed(d===undefined?2:d); }
+  function pct(v, d){ if(v===null||v===undefined||isNaN(v)) return "—"; var s=Number(v).toFixed(d===undefined?2:d); return (v>0?"+":"")+s+"%"; }
+  function monthCN(m){ return m ? (m.slice(0,4)+"年"+parseInt(m.slice(5,7),10)+"月") : "—"; }
+  function monthsBetween(a,b){
+    return (parseInt(b.slice(0,4))-parseInt(a.slice(0,4)))*12 + (parseInt(b.slice(5,7))-parseInt(a.slice(5,7)));
+  }
+
+  var L = R.labels, S = R.series, N = L.length;
+  var idxOf = {}; L.forEach(function(m,i){ idxOf[m]=i; });
+
+  /* ---------- 顶部 ---------- */
+  $("asOf").textContent = "数据截至 " + R.current.as_of + " · 共 " + N + " 个月 · " + R.recessions.length + " 次 NBER 衰退";
+  $("genAt").textContent = R.generated_at;
+  var c = R.current;
+  var nowText = "当前（" + c.as_of + "）：联邦基金利率 " + fmt(c.ffr) + "%，CPI 同比 " + fmt(c.cpi) + "%，实际利率 " + pct(c.real) + "，10Y−3M 利差 " + pct(c.slope) + "（" + (c.slope<0?"倒挂":"未倒挂") + "）" + (c.in_recession?"，NBER 标记为衰退中":"，未处于 NBER 衰退") + "。";
+  $("summary").innerHTML = "<b>一句话：</b>1954 年以来 " + R.stats.n_recessions + " 次 NBER 衰退中，" +
+    "<b>10/10</b> 都发生在联邦基金利率见顶之后，见顶到衰退开始中位仅 <b>" + R.stats.peak_lead_median + " 个月</b>；" +
+    "有完整期限利差数据的 4 次里 <b>4/4</b> 先出现倒挂，倒挂到衰退中位 <b>" + R.stats.inv_lead_median + " 个月</b>。" + nowText;
+
+  function stat(k, v, s){ return '<div class="stat"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="s">'+s+'</div></div>'; }
+  $("stats").innerHTML =
+    stat("FFR 见顶 → 衰退", "10/10", "中位 " + R.stats.peak_lead_median + " 个月（" + R.stats.peak_lead_min + "–" + R.stats.peak_lead_max + "）") +
+    stat("倒挂 → 衰退", R.stats.inv_count + "/4", "1982 年以来有数据者；中位 " + R.stats.inv_lead_median + " 个月") +
+    stat("衰退起点实际利率", pct(R.stats.real_median, 1), "中位（区间见下表）") +
+    stat("本轮倒挂", "已解除", "2022–2024 倒挂后未衰退，与历史 4/4 不同");
+
+  /* ---------- 图表 A ---------- */
+  var W = 1180, H = 430, ML = 46, MR = 14, MT = 14, MB = 26;
+  function x(i){ return ML + i / (N - 1) * (W - ML - MR); }
+  var yMin = -10, yMax = 21;
+  function y(v){ return MT + (1 - (v - yMin) / (yMax - yMin)) * (H - MT - MB); }
+
+  // 倒挂区间
+  var invRuns = [], cur = null;
+  for(var i=0;i<N;i++){
+    var inv = S.slope[i] !== null && S.slope[i] < 0;
+    if(inv && cur === null) cur = i;
+    if(!inv && cur !== null){ invRuns.push([cur, i-1]); cur = null; }
+  }
+  if(cur !== null) invRuns.push([cur, N-1]);
+
+  function band(x1, x2, fill, cls){
+    return '<rect class="'+cls+'" x="'+x1.toFixed(1)+'" y="'+MT+'" width="'+Math.max(0.5,x2-x1).toFixed(1)+'" height="'+(H-MT-MB)+'" fill="'+fill+'"/>';
+  }
+  function linePath(arr, skipNull){
+    var d = "", pen = false;
+    for(var i=0;i<N;i++){
+      var v = arr[i];
+      if(v === null || v === undefined || isNaN(v)){ pen = false; continue; }
+      d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1) + " ";
+      pen = true;
+    }
+    return d;
+  }
+
+  var svgA = ['<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'];
+  svgA.push('<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="none"/>');
+  // 衰退带
+  R.recessions.forEach(function(r){
+    var i1 = idxOf[r.start], i2 = idxOf[r.end];
+    if(i1===undefined || i2===undefined) return;
+    svgA.push(band(x(i1), x(i2), "rgba(140,150,170,.14)", "rec"));
+  });
+  // 倒挂带
+  invRuns.forEach(function(r){ svgA.push(band(x(r[0]), x(r[1]), "rgba(169,123,255,.10)", "inv")); });
+  // 网格与坐标
+  for(var vv=0; vv>=yMin; vv-=5){
+    svgA.push('<line x1="'+ML+'" y1="'+y(vv).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y(vv).toFixed(1)+'" stroke="#16212e" stroke-width="1"/>');
+    svgA.push('<text x="'+(ML-8)+'" y="'+(y(vv)+3.5).toFixed(1)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="end">'+vv+'%</text>');
+  }
+  for(var yy=20; yy>=-10; yy-=5){
+    if(yy>=0 && yy<=20){ /* already drawn by first loop only for <=0; draw positive here */ }
+  }
+  for(var vv2=5; vv2<=yMax; vv2+=5){
+    svgA.push('<line x1="'+ML+'" y1="'+y(vv2).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y(vv2).toFixed(1)+'" stroke="#16212e" stroke-width="1"/>');
+    svgA.push('<text x="'+(ML-8)+'" y="'+(y(vv2)+3.5).toFixed(1)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="end">'+vv2+'%</text>');
+  }
+  svgA.push('<line x1="'+ML+'" y1="'+y(0).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y(0).toFixed(1)+'" stroke="#2a3a4d" stroke-width="1"/>');
+  // 年份刻度
+  for(var yr=1955; yr<=2025; yr+=10){
+    var mi = L.indexOf(yr+"-01");
+    if(mi<0) continue;
+    svgA.push('<line x1="'+x(mi).toFixed(1)+'" y1="'+(H-MB)+'" x2="'+x(mi).toFixed(1)+'" y2="'+(H-MB+4)+'" stroke="#2a3a4d"/>');
+    svgA.push('<text x="'+x(mi).toFixed(1)+'" y="'+(H-8)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="middle">'+yr+'</text>');
+  }
+  // 曲线
+  svgA.push('<path d="'+linePath(S.dgs10)+'" fill="none" stroke="#4c8dff" stroke-width="1.3" opacity=".8"/>');
+  svgA.push('<path d="'+linePath(S.real)+'" fill="none" stroke="#ff5d6c" stroke-width="1.6" opacity=".9"/>');
+  svgA.push('<path d="'+linePath(S.ffr)+'" fill="none" stroke="#f0b429" stroke-width="2.2"/>');
+  // 底部倒挂细条
+  invRuns.forEach(function(r){
+    svgA.push('<rect x="'+x(r[0]).toFixed(1)+'" y="'+(H-MB-3)+'" width="'+Math.max(1,x(r[1])-x(r[0])).toFixed(1)+'" height="3" fill="rgba(169,123,255,.85)"/>');
+  });
+  // hover 线
+  svgA.push('<line id="hoverLine" x1="-10" y1="'+MT+'" x2="-10" y2="'+(H-MB)+'" stroke="#8496a9" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>');
+  svgA.push('</svg>');
+  $("chartA").innerHTML = svgA.join("") + '<div class="tooltip" id="tipA" hidden></div>';
+  $("chartSub").textContent = "衰退 " + R.recessions.length + " 段 · 倒挂 " + invRuns.length + " 段 · 灰带=NBER 衰退，紫带=倒挂";
+
+  /* hover A */
+  var wrapA = $("chartA"), svgEl = wrapA.querySelector("svg"), tipA = $("tipA"), hLine = $("hoverLine");
+  function nearestIdx(clientX){
+    var rect = svgEl.getBoundingClientRect();
+    var rel = (clientX - rect.left) / rect.width * W;
+    var t = (rel - ML) / (W - ML - MR);
+    return Math.max(0, Math.min(N - 1, Math.round(t * (N - 1))));
+  }
+  wrapA.addEventListener("mousemove", function(e){
+    var i = nearestIdx(e.clientX);
+    hLine.setAttribute("x1", x(i)); hLine.setAttribute("x2", x(i)); hLine.setAttribute("opacity", "0.7");
+    tipA.hidden = false;
+    tipA.innerHTML = '<b>' + monthCN(L[i]) + '</b>'
+      + '<div class="r"><span>FFR</span><span>' + fmt(S.ffr[i]) + '%</span></div>'
+      + '<div class="r"><span>实际利率</span><span>' + pct(S.real[i]) + '</span></div>'
+      + '<div class="r"><span>10Y</span><span>' + fmt(S.dgs10[i]) + '%</span></div>'
+      + '<div class="r"><span>10Y-3M</span><span>' + pct(S.slope[i]) + '</span></div>'
+      + '<div class="r"><span>CPI 同比</span><span>' + pct(S.cpi[i]) + '</span></div>'
+      + (S.rec[i] ? '<div class="r"><span>NBER</span><span>衰退</span></div>' : '');
+    var r = wrapA.getBoundingClientRect();
+    var px = (x(i) / W) * r.width;
+    tipA.style.left = Math.min(r.width - 170, Math.max(8, px + 12)) + 'px';
+    tipA.style.top = '18px';
+  });
+  wrapA.addEventListener("mouseleave", function(){ tipA.hidden = true; hLine.setAttribute("opacity", "0"); });
+
+  /* ---------- 图表 B：期限利差 ---------- */
+  var H2 = 210, yMin2 = -3.2, yMax2 = 4.2;
+  function y2(v){ return MT + (1 - (v - yMin2) / (yMax2 - yMin2)) * (H2 - MT - MB); }
+  var svgB = ['<svg viewBox="0 0 '+W+' '+H2+'" preserveAspectRatio="none">'];
+  R.recessions.forEach(function(r){
+    var i1 = idxOf[r.start], i2 = idxOf[r.end];
+    if(i1===undefined || i2===undefined) return;
+    svgB.push('<rect x="'+x(i1).toFixed(1)+'" y="'+MT+'" width="'+Math.max(0.5,x(i2)-x(i1)).toFixed(1)+'" height="'+(H2-MT-MB)+'" fill="rgba(140,150,170,.14)"/>');
+  });
+  invRuns.forEach(function(r){
+    svgB.push('<rect x="'+x(r[0]).toFixed(1)+'" y="'+y2(0).toFixed(1)+'" width="'+Math.max(1,x(r[1])-x(r[0])).toFixed(1)+'" height="'+Math.max(0,y2(yMin2)-y2(0)).toFixed(1)+'" fill="rgba(169,123,255,.16)"/>');
+  });
+  [-3,-2,-1,0,1,2,3,4].forEach(function(vv){
+    svgB.push('<line x1="'+ML+'" y1="'+y2(vv).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y2(vv).toFixed(1)+'" stroke="'+(vv===0?'#3a4d63':'#16212e')+'" stroke-width="1" '+(vv===0?'stroke-dasharray="4 4"':'')+'/>');
+    svgB.push('<text x="'+(ML-8)+'" y="'+(y2(vv)+3.5).toFixed(1)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="end">'+vv+'%</text>');
+  });
+  for(var yr2=1985; yr2<=2025; yr2+=10){
+    var mi2 = L.indexOf(yr2+"-01");
+    if(mi2<0) continue;
+    svgB.push('<text x="'+x(mi2).toFixed(1)+'" y="'+(H2-8)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="middle">'+yr2+'</text>');
+  }
+  svgB.push('<path d="'+linePath(S.slope)+'" fill="none" stroke="#a97bff" stroke-width="1.8"/>');
+  // 四次倒挂→衰退的标注
+  var annotations = [];
+  R.cycles.forEach(function(cy){
+    if(cy.inv_start && cy.inv_lead !== null){
+      var i0 = idxOf[cy.inv_start], i1 = idxOf[cy.start];
+      if(i0===undefined || i1===undefined) return;
+      annotations.push('<line x1="'+x(i0).toFixed(1)+'" y1="'+y2(0).toFixed(1)+'" x2="'+x(i1).toFixed(1)+'" y2="'+y2(0).toFixed(1)+'" stroke="#f0b429" stroke-width="1.2" stroke-dasharray="2 3" opacity=".8"/>');
+      annotations.push('<text x="'+((x(i0)+x(i1))/2).toFixed(1)+'" y="'+(y2(0)-6)+'" fill="#f0b429" font-size="10" font-family="monospace" text-anchor="middle">'+cy.inv_lead+'m</text>');
+    }
+  });
+  svgB.push(annotations.join(""));
+  svgB.push('</svg>');
+  $("chartB").innerHTML = svgB.join("");
+  $("slopeSub").textContent = "10Y-3M 每月均值；负值=倒挂（1982 年起有数据）";
+
+  /* ---------- 共同点 ---------- */
+  var cyc = R.cycles;
+  var leads = cyc.map(function(x){ return x.peak_lead; }).filter(function(x){ return x!==null; });
+  var realVals = cyc.map(function(x){ return x.real_at_start; });
+  var maxReal = Math.max.apply(null, realVals), minReal = Math.min.apply(null, realVals);
+  var last = cyc[cyc.length-1];
+  var inv4 = cyc.filter(function(x){ return x.inv_start; });
+  var findings = [
+    "<b>加息见顶是衰退的统一前置信号</b>：10 次衰退全部在 FFR 见顶之后开始，中位 " + R.stats.peak_lead_median + " 个月（最短 " + R.stats.peak_lead_min + "、最长 " + R.stats.peak_lead_max + " 个月，1990 年那轮因为 1989 年才见顶）。",
+    "<b>倒挂领先约一年</b>：1982 年后有完整 10Y-3M 数据的 4 次衰退，" + inv4.map(function(x){ return x.start.slice(0,4)+" 年（"+x.inv_lead+" 个月）"; }).join("、") + " —— 4/4 都先倒挂，中位提前 " + R.stats.inv_lead_median + " 个月。",
+    "<b>实际利率不是必要条件</b>：衰退起点实际利率中位 " + pct(R.stats.real_median,1) + "，区间 " + pct(minReal,1) + " ~ " + pct(maxReal,1) + "；1981 年（沃尔克，+7.0%）是极端，2020 年（−0.8%）几乎为零。",
+    "<b>通胀环境决定衰退形态</b>：1970s 的衰退起点 CPI 在 6–14%（高通胀+加息）；2001/2008/2020 的起点 CPI 只有 1.5–4.3%。",
+    "<b>软着陆确实存在但少</b>：1994–95 与 2024–26 两轮加息后都没触发衰退；当前 FFR " + fmt(c.ffr) + "%、实际 " + pct(c.real) + "、利差 " + pct(c.slope) + "，" + (c.slope<0?"仍在倒挂":"已解除倒挂且未衰退") + "，属于历史里的少数派。",
+    "<b>本轮不一样的地方</b>：2022–2024 出现长倒挂，按 4/4 的历史规律本应指向衰退，但到 " + c.as_of + " 仍未发生 —— 这既可能是软着陆，也可能是滞后；历史上倒挂最长领先 17 个月（2008），本轮已远超。",
+  ];
+  $("findings").innerHTML = findings.map(function(t,i){ return '<li><span class="n">'+String(i+1).padStart(2,"0")+'</span>'+t+'</li>'; }).join("");
+
+  $("currentBox").innerHTML = [
+    '<li><span class="n">FFR</span>联邦基金利率 <b>' + fmt(c.ffr) + '%</b>（2026-09 月均）</li>',
+    '<li><span class="n">CPI</span>CPI 同比 <b>' + pct(c.cpi) + '</b>；实际利率 <b>' + pct(c.real) + '</b></li>',
+    '<li><span class="n">10Y-3M</span>期限利差 <b>' + pct(c.slope) + '</b>（' + (c.slope<0?'倒挂':'未倒挂') + '）</li>',
+    '<li><span class="n">NBER</span><b>' + (c.in_recession?'衰退中':'非衰退') + '</b>（截至 ' + c.as_of + '）</li>',
+    '<li><span class="n">对照</span>上一轮衰退 ' + last.start.slice(0,4) + ' 年；FFR 峰值 ' + last.ffr_peak + '（' + fmt(last.ffr_peak_v) + '%）→ 衰退 ' + last.peak_lead + ' 个月</li>',
+  ].join("");
+  $("curSub").textContent = "截至 " + c.as_of;
+
+  /* ---------- 表格 ---------- */
+  var html = '<thead><tr><th>衰退开始</th><th>结束</th><th>FFR 峰值</th><th>峰值→衰退</th><th>倒挂起点</th><th>倒挂→衰退</th><th>起点实际利率</th><th>起点 CPI</th></tr></thead><tbody>';
+  cyc.forEach(function(x){
+    html += '<tr><td class="nm">' + monthCN(x.start) + '</td>'
+      + '<td class="nm">' + monthCN(x.end) + '</td>'
+      + '<td>' + (x.ffr_peak ? monthCN(x.ffr_peak) : '—') + ' <span class="muted">' + fmt(x.ffr_peak_v) + '%</span></td>'
+      + '<td>' + (x.peak_lead!==null ? x.peak_lead + ' 个月' : '—') + '</td>'
+      + '<td>' + (x.inv_start ? monthCN(x.inv_start) : '—') + '</td>'
+      + '<td>' + (x.inv_lead!==null ? x.inv_lead + ' 个月' : '—') + '</td>'
+      + '<td class="' + (x.real_at_start>0?'up':'down') + '">' + pct(x.real_at_start) + '</td>'
+      + '<td>' + pct(x.cpi_at_start) + '</td></tr>';
+  });
+  html += '</tbody>';
+  $("cycleTable").innerHTML = html;
+})();
+</script>
+</body>
+</html>

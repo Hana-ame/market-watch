@@ -37,6 +37,9 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
+      - name: Fetch history (rates.js, monthly)
+        run: python fetch_history.py --if-stale 20
+
       - name: Fetch market data
         run: |
           # 东财对境外 runner 偶发整段 502：整轮重试最多 3 次，失败也尽量由兜底快照兜住
@@ -88,7 +91,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p site
-          cp index.html README.md data.js site/
+          cp index.html cycle.html README.md data.js rates.js site/
           ls -la site
 
       - name: Configure Pages
