@@ -888,6 +888,9 @@ def main():
     now = dt.datetime.now(TZ)
     os.makedirs(SNAP_DIR, exist_ok=True)
     degraded = []
+    # 先载入「上次快照 + 兜底快照」，供各源失败时回退（必须在取数之前）
+    prev = load_json(os.path.join(DATA_DIR, "latest.json"), {})
+    fb = load_json(FALLBACK_PATH, {})
 
     def safe(name, fn, fallback=None):
         try:
@@ -907,9 +910,6 @@ def main():
     if not wl:
         wl = fb.get("watchlist") or []
     news = safe("news", fetch_news, [])
-
-    prev = load_json(os.path.join(DATA_DIR, "latest.json"), {})
-    fb = load_json(FALLBACK_PATH, {})
 
     if not indices:
         indices = prev.get("indices") or []
