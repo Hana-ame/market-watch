@@ -58,14 +58,16 @@ jobs:
               old = json.loads(subprocess.check_output(["git", "show", "HEAD:data/history.json"]))
           except Exception:
               old = []
-          print(0 if today in {x.get("date") for x in old} else 1)
+          import os
+          fb_ok = os.path.exists("data/fallback.json") and os.path.getsize("data/fallback.json") > 200
+          print(0 if (today in {x.get("date") for x in old} and fb_ok) else 1)
           PY
           )
           if [ "$SHOULD" = "1" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/history.json
-            git commit -m "chore: 记录 $(TZ=Asia/Shanghai date '+%F') 的 A股情绪历史"
+            git add data/history.json data/fallback.json
+            git commit -m "chore: 记录 $(TZ=Asia/Shanghai date '+%F') 的 A股历史与兜底快照"
             git pull --rebase --autostash origin main
             git push
           else

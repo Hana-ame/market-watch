@@ -2,6 +2,7 @@
 data.js
 data/latest.json
 data/history.local.json
+data/fallback.local.json
 data/snapshots/
 data/update.log
 update.log

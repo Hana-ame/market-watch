@@ -28,6 +28,8 @@ DATA_DIR = os.path.join(ROOT, "data")
 SNAP_DIR = os.path.join(DATA_DIR, "snapshots")
 # 本地运行写 history.local.json（不进 git）；CI 用默认 history.json（每日回写仓库）
 HISTORY_PATH = os.environ.get("MARKET_HISTORY_PATH", os.path.join(DATA_DIR, "history.json"))
+# CI 每日回写一份「A股兜底快照」：境外取数偶发 502 时，页面用上一次好评级的 A股数据填充
+FALLBACK_PATH = os.environ.get("MARKET_FALLBACK_PATH", os.path.join(DATA_DIR, "fallback.json"))
 TZ = dt.timezone(dt.timedelta(hours=8))
 HISTORY_KEEP = 120
 
@@ -898,11 +900,16 @@ def main():
     indices = safe("indices", fetch_indices)
     sparks, spark_dates, amt_hist = safe("kline", fetch_index_history, ({}, [], []))
     boards = safe("boards", fetch_boards, {})
+    if not boards:
+        boards = fb.get("boards") or {}
     breadth = safe("breadth", fetch_breadth)
     wl = safe("watchlist", fetch_watchlist, [])
+    if not wl:
+        wl = fb.get("watchlist") or []
     news = safe("news", fetch_news, [])
 
     prev = load_json(os.path.join(DATA_DIR, "latest.json"), {})
+    fb = load_json(FALLBACK_PATH, {})
 
     if not indices:
         indices = prev.get("indices") or []
@@ -922,7 +929,9 @@ def main():
         state = "休市（今日不开市）"
 
     macro = safe("macro", fetch_macro)
-    pools = safe("limit_pools", lambda: fetch_limit_pools(trade_date), {})
+    pools = safe("limit_pools", lambda: fetch_limit_pools(trade_date), {}) or {}
+    if not pools:
+        pools = {k: fb.get(k) for k in ("limit_up", "limit_down", "zhaban") if fb.get(k)}
     limit_up = pools.get("limit_up") or {"count": None, "items": [], "max_lbc": 0}
     limit_down = pools.get("limit_down") or {"count": None, "items": []}
     zhaban = pools.get("zhaban") or {"count": None, "items": []}
@@ -932,7 +941,7 @@ def main():
         limit_down["count"] = prev.get("limit_down", {}).get("count")
 
     if not breadth:
-        breadth = prev.get("breadth")
+        breadth = prev.get("breadth") or fb.get("breadth")
 
     # 成交额：今日（沪+深 K 线）与上一交易日
     today_amt = None
@@ -994,6 +1003,11 @@ def main():
         "history": history[-20:],
         "macro": macro,
     }
+    # A股兜底快照：仅在数据全绿时刷新，供后续失败运行取用
+    if not degraded and breadth and wl and boards:
+        save_json(FALLBACK_PATH, {k: snap.get(k) for k in (
+            "meta", "indices", "sparks", "breadth", "limit_up", "limit_down", "zhaban",
+            "boards", "watchlist", "amount", "score", "history")})
     snap["summary_ashare"] = build_summary(snap)
     snap["summary"] = build_macro_summary(macro) if macro else snap["summary_ashare"]
     snap["macro"]["state"] = macro_state(now)
