@@ -1,0 +1,13 @@
+# 运行期产物（不入库）
+data/snapshots/
+data/update.log
+update.log
+.update.lock
+__pycache__/
+*.pyc
+*.tmp
+qa-*.png
+
+# 本地系统文件
+.DS_Store
+Thumbs.db

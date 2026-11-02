@@ -1,0 +1,46 @@
+name: Refresh market data
+
+on:
+  schedule:
+    # GitHub Actions 的 cron 为 UTC；每 15 分钟尝试一次（平台可能延迟 5-20 分钟）
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-market-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Fetch data
+        run: python fetch_market.py
+
+      - name: Commit & push data.js
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data.js data/latest.json data/history.json || true
+          if git diff --cached --quiet; then
+            echo "data unchanged"
+          else
+            git commit -m "chore: refresh market data $(TZ=Asia/Shanghai date '+%F %H:%M')"
+            git push
+          fi
