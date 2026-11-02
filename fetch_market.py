@@ -228,22 +228,32 @@ def fetch_breadth():
     """全市场分页：涨跌家数、分布、总成交额、中位数（60 页 × 100，10 线程）"""
     base = ("https://push2.eastmoney.com/api/qt/clist/get?np=1&fltt=2&invt=2&fid=f3&pz=100"
             "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048&fields=f3,f6,f12,f14")
-    first = get_json(base + "&pn=1")
+    first = None
+    for attempt in range(4):
+        try:
+            first = get_json(base + "&pn=1", tries=2)
+            if first:
+                break
+        except Exception:  # noqa: BLE001
+            time.sleep(1.5 * (attempt + 1))
+    if not first:
+        raise RuntimeError("breadth page1 failed")
     total = int((first.get("data") or {}).get("total") or 0)
     pages = max(1, (total + 99) // 100)
 
     def page(pn):
-        for _ in range(2):
+        # 单页最多 4 次、指数退避；并发压到 6，境外跑 CI 时明显更稳
+        for attempt in range(4):
             try:
-                d = get_json(base + f"&pn={pn}", tries=2)
+                d = get_json(base + f"&pn={pn}", tries=1, timeout=25)
                 return ((d.get("data") or {}).get("diff") or [])
             except Exception:  # noqa: BLE001
-                time.sleep(1)
+                time.sleep(1.2 * (attempt + 1))
         return []
 
     rows = list((first.get("data") or {}).get("diff") or [])
     if pages > 1:
-        with ThreadPoolExecutor(10) as ex:
+        with ThreadPoolExecutor(6) as ex:
             for chunk in ex.map(page, range(2, pages + 1)):
                 rows.extend(chunk)
 
@@ -333,10 +343,16 @@ def fetch_watchlist():
     for chunk in (secids[:9], secids[9:]):
         if not chunk:
             continue
-        d = get_json("https://push2.eastmoney.com/api/qt/ulist.np/get"
-                     f"?fltt=2&invt=2&secids={','.join(chunk)}&fields={FIELDS_QUOTE}", tries=4)
-        for x in ((d.get("data") or {}).get("diff") or []):
-            by_code[str(x.get("f12"))] = x
+        for attempt in range(3):
+            try:
+                d = get_json("https://push2.eastmoney.com/api/qt/ulist.np/get"
+                             f"?fltt=2&invt=2&secids={','.join(chunk)}&fields={FIELDS_QUOTE}",
+                             tries=1, timeout=25)
+                for x in ((d.get("data") or {}).get("diff") or []):
+                    by_code[str(x.get("f12"))] = x
+                break
+            except Exception:  # noqa: BLE001
+                time.sleep(1.5 * (attempt + 1))
     groups = []
     for market, items in WATCHLIST:
         rows = []
