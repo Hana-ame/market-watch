@@ -9,7 +9,7 @@
 
 - 仓库：https://github.com/Hana-ame/market-watch （PUBLIC）
 - GitHub Actions 每 15 分钟跑一次 `fetch_market.py`，把 `index.html` + 生成的 `data.js` 作为 Pages 产物部署；`data.js` 不入库（否则每 15 分钟一个提交会把仓库撑大）。
-- `data/history.json` 只在每个交易日变化一次时才回写提交，用于「近期节奏」多日累积。
+- `data/history.json` 每个交易日只回写一次（要求已收盘、无降级、当日尚未记录），用于「近期节奏」多日累积。
 - 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；自选股批量报价已拆成两批 + 重试来降低概率。
 
 ## 本地运行
