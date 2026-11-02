@@ -522,10 +522,14 @@
 
 <div class="fatal" id="fatal" hidden>
   <div class="box">
-    <h2>还没有行情数据</h2>
-    <p>页面需要同目录下的 <code>data.js</code>。请先跑一次取数：</p>
-    <p><code>cd /mnt/e/market-watch &amp;&amp; bash update.sh</code><br>或在 Windows 资源管理器双击 <code>update.bat</code>。</p>
-    <p class="muted">定时任务装好后，盘中每 5 分钟、收盘后 05 分会自动刷新，本页每 60 秒自动重载数据。</p>
+    <h2>行情数据没有加载成功</h2>
+    <p>页面需要 <code>data.js</code>。通常是这几种情况：</p>
+    <p class="muted">① 浏览器缓存了之前的一次 404（本次已带 <code>?v=</code> 重试）；<br>② 刚好赶上部署切换的几十秒窗口；<br>③ 打开的是本地 <code>index.html</code>，但同目录没有 <code>data.js</code>。</p>
+    <p><button class="btn" id="fatalRetry">重新加载</button>
+       <a class="btn" style="text-decoration:none;display:inline-block" href="https://hana-ame.github.io/market-watch/">打开备份站</a></p>
+    <p class="muted" id="fatalDetail">—</p>
+    <p class="muted">本地运行：<code>cd /mnt/e/market-watch &amp;&amp; bash update.sh</code>（或双击 <code>update.bat</code>）</p>
+    <p class="muted">本页每 30 秒自动重试一次；恢复后会自己显示行情。</p>
   </div>
 </div>
 
@@ -1138,7 +1142,7 @@
   }
 
   function renderAll(){
-    if(!window.MKT){ $("fatal").hidden = false; return; }
+    if(!window.MKT){ showFatal("data.js 已加载但没有 window.MKT（文件可能损坏）"); return; }
     MKT = window.MKT;
     $("fatal").hidden = true;
     renderMeta();
@@ -1188,8 +1192,49 @@
   }
   $("btnRefresh").addEventListener("click", function(){ reload(true); });
 
-  renderAll();
-  setInterval(function(){ reload(false); }, REFRESH_MS);
+  /* 首屏兜底：静态 <script src="data.js"> 失败时，带 cache-buster 重试 → 再退到 GitHub Pages 备份站 */
+  var fatalTimer = null;
+  function showFatal(msg){
+    $("fatal").hidden = false;
+    $("fatalDetail").textContent = msg || "";
+    if(!fatalTimer){
+      fatalTimer = setInterval(function(){ tryBoot(0); }, 30000);
+    }
+  }
+  function loadScript(src, cb){
+    var sc = document.createElement("script");
+    sc.src = src;
+    sc.onload = function(){ sc.remove(); cb(true); };
+    sc.onerror = function(){ sc.remove(); cb(false); };
+    document.body.appendChild(sc);
+  }
+  function bootOk(){
+    if(fatalTimer){ clearInterval(fatalTimer); fatalTimer = null; }
+    renderAll();
+  }
+  function tryBoot(i){
+    var sources = [
+      "data.js?v=" + Date.now(),
+      "https://watch.moonchan.xyz/data.js?t=" + Date.now(),
+      "https://hana-ame.github.io/market-watch/data.js?t=" + Date.now()
+    ];
+    if(i >= sources.length){
+      showFatal("同目录 data.js 与备份站都没有加载成功（已重试 " + (i + 1) + " 次）");
+      return;
+    }
+    loadScript(sources[i], function(ok){
+      if(ok && window.MKT){ bootOk(); }
+      else { tryBoot(i + 1); }
+    });
+  }
+
+  if(window.MKT){ bootOk(); }
+  else { $("fatalDetail").textContent = "正在重试加载 data.js …"; tryBoot(0); }
+  $("fatalRetry").addEventListener("click", function(){
+    $("fatal").hidden = true;
+    tryBoot(0);
+  });
+  setInterval(function(){ if(window.MKT){ reload(false); } }, REFRESH_MS);
 })();
 </script>
 </body>
