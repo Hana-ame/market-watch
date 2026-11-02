@@ -269,6 +269,9 @@ def fetch_breadth():
         valid += 1
         pcts.append(p)
         amount += num(x.get("f6")) or 0
+    # 分页部分失败时会静默少数据（曾出现 500 只全跌的假宽度）：样本不足视为失败，走兜底快照
+    if total and valid < total * 0.9:
+        raise RuntimeError(f"breadth incomplete: {valid}/{total}")
     up = sum(1 for p in pcts if p > 0.001)
     down = sum(1 for p in pcts if p < -0.001)
     flat = valid - up - down
