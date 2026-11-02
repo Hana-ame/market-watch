@@ -914,10 +914,16 @@ def main():
     news = safe("news", fetch_news, [])
 
     if not indices:
-        indices = prev.get("indices") or []
+        indices = prev.get("indices") or fb.get("indices") or []
     if not indices:
         print("[fatal] 无指数数据，保留旧 data.js 不变", file=sys.stderr)
         return 2
+    # 东财整段 502 时，A股区块整体用兜底快照，主看板块（新浪）不受影响
+    if not sparks:
+        sparks = fb.get("sparks") or {}
+    if not amt_hist:
+        amt_hist = [{"date": a["date"], "amount": a["amount"]}
+                    for a in ((fb.get("amount") or {}).get("history") or [])]
 
     # 交易日：指数 K 线最后一根（盘中当根即当日）
     # 交易日一律以指数 K 线最后一根为准：盘中当根即当日，盘前/周末/节假日自动回落到上一交易日，
@@ -947,6 +953,9 @@ def main():
 
     if not breadth:
         breadth = prev.get("breadth") or fb.get("breadth")
+    if not amt_hist and breadth:
+        amt_hist = [{"date": a["date"], "amount": a["amount"]}
+                    for a in ((fb.get("amount") or {}).get("history") or [])]
 
     # 成交额：今日（沪+深 K 线）与上一交易日
     today_amt = None

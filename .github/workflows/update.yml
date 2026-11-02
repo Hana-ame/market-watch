@@ -38,7 +38,17 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Fetch market data
-        run: python fetch_market.py
+        run: |
+          # 东财对境外 runner 偶发整段 502：整轮重试最多 3 次，失败也尽量由兜底快照兜住
+          for i in 1 2 3; do
+            echo "=== attempt $i ==="
+            if python fetch_market.py; then
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "all attempts failed"
+          exit 1
 
       - name: Persist daily history (once per trading day, clean data only)
         run: |
