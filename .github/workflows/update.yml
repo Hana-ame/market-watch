@@ -7,6 +7,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  repository_dispatch:
+    types: [refresh]
 
 permissions:
   contents: write   # 用于把每日情绪历史回写仓库
