@@ -37,17 +37,37 @@ jobs:
       - name: Fetch market data
         run: python fetch_market.py
 
-      - name: Persist daily history (only changes once per trading day)
+      - name: Persist daily history (once per trading day, clean data only)
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/history.json
-          if git diff --cached --quiet; then
-            echo "history unchanged"
-          else
+          SHOULD=$(python3 - <<'PY'
+          import json, subprocess
+          try:
+              latest = json.load(open("data/latest.json"))
+              meta = latest.get("meta", {})
+              hist = json.load(open("data/history.json"))
+          except Exception:
+              print(0); raise SystemExit
+          if meta.get("state") != "已收盘" or meta.get("degraded"):
+              print(0); raise SystemExit
+          if not hist or not hist[-1].get("amount"):
+              print(0); raise SystemExit
+          today = hist[-1]["date"]
+          try:
+              old = json.loads(subprocess.check_output(["git", "show", "HEAD:data/history.json"]))
+          except Exception:
+              old = []
+          print(0 if today in {x.get("date") for x in old} else 1)
+          PY
+          )
+          if [ "$SHOULD" = "1" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/history.json
             git commit -m "chore: 记录 $(TZ=Asia/Shanghai date '+%F') 的 A股情绪历史"
             git pull --rebase --autostash origin main
             git push
+          else
+            echo "history: skip (intraday / degraded / already recorded)"
           fi
 
       - name: Prepare site
