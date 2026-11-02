@@ -1,8 +1,11 @@
-# 运行期产物（不入库）
+# 运行期产物（不入库；Pages 由 CI 生成 data.js 后部署）
+data.js
+data/latest.json
 data/snapshots/
 data/update.log
 update.log
 .update.lock
+site/
 __pycache__/
 *.pyc
 *.tmp
