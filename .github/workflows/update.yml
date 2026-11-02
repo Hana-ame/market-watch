@@ -5,6 +5,8 @@ on:
     # GitHub Actions 的 cron 为 UTC；每 15 分钟尝试一次（平台可能延迟 5-20 分钟）
     - cron: "*/15 * * * *"
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: write
