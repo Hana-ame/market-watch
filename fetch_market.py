@@ -325,10 +325,16 @@ def fetch_limit_pools(trade_date):
 
 
 def fetch_watchlist():
-    secids = ",".join(s for _, group in WATCHLIST for s, _, _ in group)
-    d = get_json("https://push2.eastmoney.com/api/qt/ulist.np/get"
-                 f"?fltt=2&invt=2&secids={secids}&fields={FIELDS_QUOTE}")
-    by_code = {str(x.get("f12")): x for x in ((d.get("data") or {}).get("diff") or [])}
+    """东财批量报价；17 个 secid 一次请求偶发 502（境外 IP 更明显），拆两批 + 多试。"""
+    secids = [s for _, group in WATCHLIST for s, _, _ in group]
+    by_code = {}
+    for chunk in (secids[:9], secids[9:]):
+        if not chunk:
+            continue
+        d = get_json("https://push2.eastmoney.com/api/qt/ulist.np/get"
+                     f"?fltt=2&invt=2&secids={','.join(chunk)}&fields={FIELDS_QUOTE}", tries=4)
+        for x in ((d.get("data") or {}).get("diff") or []):
+            by_code[str(x.get("f12"))] = x
     groups = []
     for market, items in WATCHLIST:
         rows = []
