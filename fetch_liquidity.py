@@ -30,8 +30,11 @@ import datetime as dt
 import io
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
+from urllib.parse import urlencode
 
 import requests
 
@@ -42,7 +45,8 @@ OUT = os.path.join(ROOT, "liquidity.js")
 
 SESSION = requests.Session()
 SESSION.trust_env = False
-SESSION.headers.update({"User-Agent": "Mozilla/5.0 market-watch/1.0"})
+# 注意：不要覆盖 User-Agent。FRED 对自定义 UA（含伪装浏览器）会长时间挂住不返回，
+# 默认的 python-requests/x 与 curl/x 都能正常拿到 CSV。
 
 SERIES = {
     "WALCL": "美联储总资产（周，百万美元）",
@@ -68,9 +72,33 @@ RATE_YEARS = 2     # 资金价格曲线窗口
 COT_YEARS = 3      # COT 窗口
 TODAY = dt.date.today()
 
+CURL = shutil.which("curl")
+
 
 def log(msg):
     print(msg, flush=True)
+
+
+def http_get(url, params=None, timeout=25):
+    """优先用 curl 取文本。
+
+    FRED 对自定义 UA 的请求会长时间挂住（实测 Mozilla 伪装与自造 UA 均超时），
+    而 curl 默认 UA 稳定，所以 curl 优先、requests（默认 UA）兜底。
+    """
+    if params:
+        url = url + "?" + urlencode(params)
+    if CURL:
+        try:
+            out = subprocess.run(
+                [CURL, "-fsSL", "--compressed", "--max-time", str(timeout), url],
+                capture_output=True, timeout=timeout + 8)
+            if out.returncode == 0 and out.stdout:
+                return out.stdout.decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001
+            pass
+    r = SESSION.get(url, timeout=(6, timeout))
+    r.raise_for_status()
+    return r.text
 
 
 def fetch_csv(series_id, max_age_days=1):
@@ -82,15 +110,16 @@ def fetch_csv(series_id, max_age_days=1):
         if age < max_age_days and os.path.getsize(path) > 500:
             return open(path, encoding="utf-8").read()
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
-    for attempt in range(3):
+    for attempt in range(2):
         try:
-            r = SESSION.get(url, timeout=40)
-            r.raise_for_status()
-            text = r.text
+            text = http_get(url, timeout=25)
+            if len(text) < 200:
+                raise RuntimeError(f"响应过短 {len(text)}B")
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
             return text
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            log(f"[warn] {series_id} 第 {attempt + 1} 次失败：{e}")
             time.sleep(2 * (attempt + 1))
     if os.path.exists(path):
         log(f"[warn] {series_id} 抓取失败，沿用缓存")
@@ -196,11 +225,10 @@ def fetch_cot():
         "$order": "report_date_as_yyyy_mm_dd DESC",
         "$limit": "400",
     }
-    for attempt in range(3):
+    for attempt in range(2):
         try:
-            r = SESSION.get(COT_URL, params=params, timeout=40)
-            r.raise_for_status()
-            records = r.json()
+            text = http_get(COT_URL, params=params, timeout=25)
+            records = json.loads(text)
             rows = parse_cot(records)
             if len(rows) < 10:
                 raise RuntimeError(f"COT 记录过少：{len(rows)}")
@@ -239,7 +267,13 @@ def main():
             return 0
 
     raw = {}
+    budget_s = 180          # 抓取总预算，超出后剩余序列直接跳过（页面标注降级），避免拖死 CI
+    fetch_t0 = time.time()
     for sid in SERIES:
+        if time.time() - fetch_t0 > budget_s:
+            log(f"[warn] {sid} 跳过：已超出 {budget_s}s 抓取预算")
+            raw[sid] = []
+            continue
         try:
             raw[sid] = parse(fetch_csv(sid))
         except Exception as e:  # noqa: BLE001

@@ -41,8 +41,9 @@ jobs:
         run: python fetch_history.py --if-stale 20
 
       - name: Fetch liquidity (liquidity.js, daily)
+        timeout-minutes: 6
         run: |
-          # FRED + CFTC；任一源失败都不阻断整站发布（页面会隐藏缺失区块并标注降级）
+          # FRED + CFTC；脚本内部有抓取预算与 curl 优先策略，任一源失败都不阻断整站发布
           python fetch_liquidity.py --if-stale 1 || echo "[warn] fetch_liquidity 失败，沿用旧 liquidity.js"
 
       - name: Fetch market data
