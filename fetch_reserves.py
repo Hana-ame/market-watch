@@ -213,6 +213,12 @@ def main():
     def to_map(rows):
         return dict((d, v) for d, v in rows if v is not None)
 
+    # 固定 3T 红线对照（华尔街常用整数口径）；3T 占当前 GDP 约 9.1%，与 10% 动态线（3.30T）并存
+    LINE_3T = 3_000_000.0  # 百万美元
+    line_3t = [LINE_3T] * n
+    gap_3t = [round(r - LINE_3T, 0) if r is not None else None for r in series["reserves"]]
+    pct_3t = [round(LINE_3T / g * 100.0, 2) if g else None for g in gdp_series]
+
     iorb_map = to_map(raw["IORB"])
     iorr_map = to_map(raw["IORR"])
     tgtu_map = to_map(raw["DFEDTARU"])
@@ -317,12 +323,15 @@ def main():
         "gdp_pct": pct_gdp,
         "safe_line": safe_line,
         "gap": gap,
+        "line_3t": line_3t,
+        "gap_3t": gap_3t,
+        "pct_3t": pct_3t,
         "latest": latest,
         "rates": rate,
         "rates_latest": rates_latest,
         "hist": hist,
         "events": events,
-        "config": {"safe_gdp_pct": SAFE_GDP_PCT, "week_window": WEEK_WINDOW},
+        "config": {"safe_gdp_pct": SAFE_GDP_PCT, "week_window": WEEK_WINDOW, "line_3t": LINE_3T},
         "generated_at": dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M"),
         "sources": {
             "WRESBAL": "https://fred.stlouisfed.org/series/WRESBAL",
