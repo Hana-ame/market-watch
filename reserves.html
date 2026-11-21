@@ -125,6 +125,21 @@
   <div class="summary" id="summary">正在加载准备金数据…</div>
   <div class="stats" id="stats"></div>
 
+  <section class="panel" id="iorbPanel">
+    <div class="panel-h">
+      <div class="panel-t">银行存放美联储的真实无风险收益率（IORB）</div>
+      <div class="panel-sub" id="iorbSub">—</div>
+    </div>
+    <div class="stats" id="iorbStats" style="grid-template-columns:repeat(4,minmax(0,1fr))"></div>
+    <div class="chart-wrap" id="chartRates"></div>
+    <div class="legend">
+      <span class="li"><i style="background:#37c9d8"></i>IORB 准备金余额利率（真实无风险收益）</span>
+      <span class="li"><i style="background:#f0b429"></i>目标区间上限 − 0.10%（用户口径）</span>
+      <span class="li"><i style="background:#0ecb81"></i>SOFR 隔夜融资利率</span>
+    </div>
+    <div class="panel-sub" style="margin-top:8px">IORB = 银行把准备金存在美联储账上赚到的利息；自 2021-07 起精确等于「联邦基金目标区间上限 − 10bp」。SOFR − IORB 为正说明回购融资比存准备金更贵。</div>
+  </section>
+
   <section class="panel">
     <div class="panel-h">
       <div class="panel-t">银行准备金 vs 安全线（10% GDP）</div>
@@ -204,6 +219,7 @@
   var $ = function(id){ return document.getElementById(id); };
 
   function fmt(v, d){ if(v===null||v===undefined||isNaN(v)) return "—"; return Number(v).toFixed(d===undefined?2:d); }
+  function tr(v, d){ if(v===null||v===undefined||isNaN(v)) return "—"; var s=Number(v).toFixed(d===undefined?2:d); return (v>0?"+":"")+s; }
   function trl(v){ if(v===null||v===undefined||isNaN(v)) return "—"; return (v>0?"+":"")+ (v/1e6).toFixed(2) + " 万亿"; }
   function tn(v){ if(v===null||v===undefined||isNaN(v)) return "—"; return (v/1e6).toFixed(2) + " 万亿"; }
   function dateCN(d){ return d ? d.slice(0,4)+"年"+parseInt(d.slice(5,7),10)+"月"+parseInt(d.slice(8,10),10)+"日" : "—"; }
@@ -234,6 +250,8 @@
     stat("占年化 GDP", fmt(lat.pct_gdp) + "%", "安全线 " + L.config.safe_gdp_pct + "%（" + tn(lat.safe_line) + "）", cls) +
     stat("财政部 TGA", tn(lat.tga), "4 周 " + trl(lat.chg_4w_tga)) +
     stat("ON RRP", tn(lat.rrp), "4 周 " + trl(lat.chg_4w_rrp));
+
+  /* ---------- 真实无风险收益率（IORB）：渲染移到图表常量之后 ---------- */
 
   /* ---------- 图表公共 ---------- */
   var W = 1180, ML = 52, MR = 14, MT = 14, MB = 26;
@@ -351,6 +369,62 @@
   svg3.push('</svg>');
   $("chartTga").innerHTML = svg3.join("");
   $("chartTgaSub").textContent = "ON RRP 峰值 " + tn(L.hist.rrp_max.value) + "（" + dateMD(L.hist.rrp_max.date) + "）；2019 钱荒前 RRP 近乎归零（银行没钱借出）";
+
+  /* ---------- 真实无风险收益率（IORB）：在图表常量之后渲染 ---------- */
+  var RL = L.rates_latest || {};
+  var iorbPanel = $("iorbPanel");
+  if(RL.iorb){
+    var formulaVal = (RL.tgt_u && RL.tgt_u.value !== null) ? (RL.tgt_u.value - 0.10) : null;
+    var iorbExact = (RL.iorb_minus_formula !== null && Math.abs(RL.iorb_minus_formula) < 0.001);
+    var spreadCls = (RL.spread !== null && RL.spread > 0.05) ? "danger" : "";
+    $("iorbStats").innerHTML =
+      stat("IORB 真实无风险", fmt(RL.iorb.value) + "%", "生效 " + dateMD(RL.iorb.date),
+           (formulaVal !== null && Math.abs(RL.iorb.value - formulaVal) < 0.001) ? "" : "low") +
+      stat("目标区间上限 − 0.10%", (formulaVal !== null ? fmt(formulaVal) : "—") + "%",
+           "上限 " + fmt(RL.tgt_u.value) + "% − 10bp" + (iorbExact ? " · 与 IORB 一致" : " · 有偏差 " + tr(RL.iorb_minus_formula, 3))) +
+      stat("SOFR − IORB 利差", (RL.spread !== null ? tr(RL.spread, 2) + "pp" : "—"),
+           "回购融资相对准备金的溢价", spreadCls) +
+      stat("目标区间", fmt(RL.tgt_l.value) + "% – " + fmt(RL.tgt_u.value) + "%",
+           "联邦基金利率目标区间");
+    // 利率曲线（IORB vs 上限−0.10 vs SOFR）
+    var R = L.rates;
+    if(R && R.labels && R.labels.length){
+      var RN = R.labels.length, RH = 240;
+      var rx = function(i){ return ML + i / (RN - 1) * (W - ML - MR); };
+      var rMin = 0, rMax = 8;
+      function ry(v){ return MT + (1 - (v - rMin) / (rMax - rMin)) * (RH - MT - MB); }
+      var formulaSeries = R.tgt_u.map(function(v){ return v===null||v===undefined ? null : v - 0.10; });
+      var svgR = ['<svg viewBox="0 0 '+W+' '+RH+'" preserveAspectRatio="none">'];
+      svgR.push(gridAndAxis(ry, RH, [0,2,4,6,8], function(v){ return v+"%"; }));
+      for(var yr=2009; yr<=2026; yr+=2){
+        var mi = R.labels.indexOf(yr+"-01-01");
+        if(mi<0) continue;
+        svgR.push('<line x1="'+rx(mi).toFixed(1)+'" y1="'+(RH-MB)+'" x2="'+rx(mi).toFixed(1)+'" y2="'+(RH-MB+4)+'" stroke="#2a3a4d"/>');
+        svgR.push('<text x="'+rx(mi).toFixed(1)+'" y="'+(RH-8)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="middle">'+yr+'</text>');
+      }
+      svgR.push('<path d="'+ratePath(R.sofr, rx, ry)+'" fill="none" stroke="#0ecb81" stroke-width="1.6" opacity=".85"/>');
+      svgR.push('<path d="'+ratePath(formulaSeries, rx, ry)+'" fill="none" stroke="#f0b429" stroke-width="1.5" stroke-dasharray="5 4"/>');
+      svgR.push('<path d="'+ratePath(R.iorb, rx, ry)+'" fill="none" stroke="#37c9d8" stroke-width="2.1"/>');
+      svgR.push('</svg>');
+      $("chartRates").innerHTML = svgR.join("");
+      $("iorbSub").textContent = "2008-10 起 · 当前 IORB " + fmt(RL.iorb.value) + "% = 上限 " + fmt(RL.tgt_u.value) + "% − 0.10%";
+    } else {
+      $("chartRates").innerHTML = '<div class="muted">利率序列未生成（fetch_reserves.py 需取 IORB/IORR/DFEDTARU/SOFR）</div>';
+    }
+  } else {
+    iorbPanel.hidden = true;
+  }
+
+  function ratePath(arr, xf, yf){
+    var d = "", pen = false;
+    for(var j=0;j<arr.length;j++){
+      var v = arr[j];
+      if(v === null || v === undefined || isNaN(v)){ pen = false; continue; }
+      d += (pen ? "L" : "M") + xf(j).toFixed(1) + " " + yf(v).toFixed(1) + " ";
+      pen = true;
+    }
+    return d;
+  }
 
   /* ---------- 怎么读 ---------- */
   var findings = [

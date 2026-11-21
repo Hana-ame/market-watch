@@ -39,6 +39,11 @@ SERIES = {
     "WDTGAL": "财政部 TGA（百万美元）",
     "WLRRAL": "隔夜逆回购 ON RRP（百万美元）",
     "GDP": "名义 GDP（十亿美元）",
+    "IORB": "准备金余额利率（日，%）",
+    "IORR": "准备金余额利率-旧口径（日，%，2021-07 前）",
+    "DFEDTARU": "联邦基金目标区间上限（日，%）",
+    "DFEDTARL": "联邦基金目标区间下限（日，%）",
+    "SOFR": "担保隔夜融资利率（日，%）",
 }
 # 准备金占 GDP 安全线（华尔街经验口径）
 SAFE_GDP_PCT = 10.0
@@ -189,6 +194,86 @@ def main():
         "chg_4w_rrp": week_chg(series["rrp"]),
     }
 
+    # ---------- 真实无风险收益率（IORB 与目标区间） ----------
+    # IORB 官方序列自 2021-07-29 起；之前用 IORR（2008-10 起）衔接。
+    # IORB = 目标区间上限 − 10bp 在 2021-07 后精确成立，是「银行存美联储的真实无风险收益」。
+    def to_map(rows):
+        return dict((d, v) for d, v in rows if v is not None)
+
+    iorb_map = to_map(raw["IORB"])
+    iorr_map = to_map(raw["IORR"])
+    tgtu_map = to_map(raw["DFEDTARU"])
+    tgtl_map = to_map(raw["DFEDTARL"])
+    sofr_map = to_map(raw["SOFR"])
+    iorb_all = {}
+    iorb_all.update(iorr_map)   # 旧口径
+    iorb_all.update(iorb_map)   # 新口径覆盖
+    rate_dates = sorted(set(iorb_all) | set(tgtu_map) | set(tgtl_map))
+    if rate_dates:
+        rd0, rd1 = rate_dates[0], rate_dates[-1]
+    else:
+        rd0 = rd1 = None
+
+    def last_on_or_before(m, date):
+        """返回 (日期, 值)，取 date 当天或之前最近的值。"""
+        if date is None:
+            return None
+        for _ in range(4000):
+            if date in m:
+                return (date, m[date])
+            t = dt.date.fromisoformat(date) - dt.timedelta(days=1)
+            date = t.isoformat()
+            if date < "2008-10-01":
+                break
+        return None
+
+    def rate_series(keys, m, fill):
+        """对一组日期，取每个日期当天或之前的最近值（前向填充）。"""
+        out = []
+        last_v = None
+        for d in keys:
+            v = m.get(d)
+            if v is None and last_v is not None:
+                v = last_v
+            elif v is not None:
+                last_v = v
+            out.append(v if v is not None else None)
+        return out
+
+    rate_labels = rate_dates
+    rate = {
+        "labels": rate_labels,
+        "iorb": rate_series(rate_labels, iorb_all, None),
+        "tgt_u": rate_series(rate_labels, tgtu_map, None),
+        "tgt_l": rate_series(rate_labels, tgtl_map, None),
+        "sofr": rate_series(rate_labels, sofr_map, None),
+    }
+    # 当前读数
+    def last_pair(m):
+        if not m:
+            return None
+        d, v = sorted(m.items())[-1]
+        return {"date": d, "value": v}
+
+    iorb_cur = last_pair(iorb_all)
+    tgtu_cur = last_pair(tgtu_map)
+    tgtl_cur = last_pair(tgtl_map)
+    sofr_cur = last_pair(sofr_map)
+    # 目标区间上限 − 10bp 与 IORB 的差（当前）
+    iorb_vs_formula = None
+    if iorb_cur and tgtu_cur:
+        iorb_vs_formula = round(iorb_cur["value"] - (tgtu_cur["value"] - 0.10), 4)
+
+    rates_latest = {
+        "iorb": iorb_cur,
+        "tgt_u": tgtu_cur,
+        "tgt_l": tgtl_cur,
+        "sofr": sofr_cur,
+        "iorb_minus_formula": iorb_vs_formula,
+        "spread": (round(sofr_cur["value"] - iorb_cur["value"], 3)
+                   if sofr_cur and iorb_cur else None),
+    }
+
     def since(arr, start="2008-01-01"):
         return [(d, v) for d, v in zip(labels, arr) if d >= start and v is not None]
 
@@ -220,6 +305,8 @@ def main():
         "safe_line": safe_line,
         "gap": gap,
         "latest": latest,
+        "rates": rate,
+        "rates_latest": rates_latest,
         "hist": hist,
         "events": events,
         "config": {"safe_gdp_pct": SAFE_GDP_PCT, "week_window": WEEK_WINDOW},
@@ -229,6 +316,11 @@ def main():
             "WDTGAL": "https://fred.stlouisfed.org/series/WDTGAL",
             "WLRRAL": "https://fred.stlouisfed.org/series/WLRRAL",
             "GDP": "https://fred.stlouisfed.org/series/GDP",
+            "IORB": "https://fred.stlouisfed.org/series/IORB",
+            "IORR": "https://fred.stlouisfed.org/series/IORR",
+            "DFEDTARU": "https://fred.stlouisfed.org/series/DFEDTARU",
+            "DFEDTARL": "https://fred.stlouisfed.org/series/DFEDTARL",
+            "SOFR": "https://fred.stlouisfed.org/series/SOFR",
         },
     }
     js = "window.RESERVES = " + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + ";\n"
@@ -237,9 +329,11 @@ def main():
         f.write(js)
     os.replace(tmp, OUT)
 
+    rl = rates_latest
     print(f"[ok] {n} 周（{labels[0]} → {labels[-1]}）· 准备金 {latest['reserves']/1e6:.2f} 万亿 · "
           f"占 GDP {latest['pct_gdp']:.2f}%（安全线 {SAFE_GDP_PCT:.0f}%）· "
-          f"TGA {latest['tga']/1e6:.2f} 万亿 · RRP {latest['rrp']/1e6:.2f} 万亿")
+          f"TGA {latest['tga']/1e6:.2f} 万亿 · RRP {latest['rrp']/1e6:.2f} 万亿 · "
+          f"IORB {rl['iorb']['value'] if rl['iorb'] else '—'}%（目标上限 {rl['tgt_u']['value'] if rl['tgt_u'] else '—'}）")
     return 0
 
 
