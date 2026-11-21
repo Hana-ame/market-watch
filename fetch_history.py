@@ -39,13 +39,21 @@ SERIES = {
     "CPIAUCSL": "CPI（季调）",
     "USREC": "NBER 衰退指标",
 }
+# 缓存过期天数：日频序列（DGS10/T10Y3M）用 1 天，让页面收益率每天跟上；月频/低频序列保留 20 天
+SERIES_MAX_AGE = {
+    "DGS10": 1,
+    "T10Y3M": 1,
+    "FEDFUNDS": 20,
+    "CPIAUCSL": 20,
+    "USREC": 20,
+}
 START = "1954-07-01"
 
 
-def fetch_csv(series_id, max_age_days=20):
+def fetch_csv(series_id, max_age_days=20, force=False):
     os.makedirs(CACHE, exist_ok=True)
     path = os.path.join(CACHE, f"{series_id}.csv")
-    if os.path.exists(path):
+    if not force and os.path.exists(path):
         age = (time.time() - os.path.getmtime(path)) / 86400
         if age < max_age_days and os.path.getsize(path) > 1000:
             return open(path, encoding="utf-8").read()
@@ -88,7 +96,7 @@ def month_key(d):
 
 
 def main():
-    stale_days = 20
+    stale_days = 1  # DGS10/T10Y3M 为日频，rates.js 每天重建让最新月均数据及时进页面；月频序列由 CSV 缓存控制
     if "--if-stale" in sys.argv:
         i = sys.argv.index("--if-stale")
         if i + 1 < len(sys.argv):
@@ -99,7 +107,7 @@ def main():
             print(f"[skip] rates.js {age:.1f} 天前生成（阈值 {stale_days}）")
             return 0
 
-    raw = {sid: parse(fetch_csv(sid)) for sid in SERIES}
+    raw = {sid: parse(fetch_csv(sid, SERIES_MAX_AGE.get(sid, 20), force=(stale_days == 0))) for sid in SERIES}
 
     # 月度聚合：利率/利差取月均，衰退取月末值，CPI 取月末值
     def monthly_avg(rows):

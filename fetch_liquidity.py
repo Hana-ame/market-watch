@@ -101,11 +101,11 @@ def http_get(url, params=None, timeout=25):
     return r.text
 
 
-def fetch_csv(series_id, max_age_days=1):
+def fetch_csv(series_id, max_age_days=1, force=False):
     """抓 FRED CSV，带本地缓存与重试；失败时退回旧缓存。"""
     os.makedirs(CACHE, exist_ok=True)
     path = os.path.join(CACHE, f"{series_id}.csv")
-    if os.path.exists(path):
+    if not force and os.path.exists(path):
         age = (time.time() - os.path.getmtime(path)) / 86400
         if age < max_age_days and os.path.getsize(path) > 500:
             return open(path, encoding="utf-8").read()
@@ -275,7 +275,7 @@ def main():
             raw[sid] = []
             continue
         try:
-            raw[sid] = parse(fetch_csv(sid))
+            raw[sid] = parse(fetch_csv(sid, force=(stale_days == 0)))
         except Exception as e:  # noqa: BLE001
             log(f"[warn] {sid} 完全不可用：{e}")
             raw[sid] = []

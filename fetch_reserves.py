@@ -47,15 +47,20 @@ SERIES = {
     "DFEDTARL": "联邦基金目标区间下限（日，%）",
     "SOFR": "担保隔夜融资利率（日，%）",
 }
+# 缓存过期天数：日频序列 1 天（每天跟上）；周频 H.4.1 / 季度 GDP / 停更 IORR 保留 20 天
+SERIES_MAX_AGE = {
+    "WTREGEN": 1, "RRPONTSYD": 1, "IORB": 1, "DFEDTARU": 1, "DFEDTARL": 1, "SOFR": 1,
+    "WRESBAL": 20, "WDTGAL": 20, "WLRRAL": 20, "GDP": 20, "IORR": 20,
+}
 # 准备金占 GDP 安全线（华尔街经验口径）
 SAFE_GDP_PCT = 10.0
 WEEK_WINDOW = 4
 
 
-def fetch_csv(series_id, max_age_days=20):
+def fetch_csv(series_id, max_age_days=20, force=False):
     os.makedirs(CACHE, exist_ok=True)
     path = os.path.join(CACHE, f"{series_id}.csv")
-    if os.path.exists(path):
+    if not force and os.path.exists(path):
         age = (time.time() - os.path.getmtime(path)) / 86400
         if age < max_age_days and os.path.getsize(path) > 1000:
             return open(path, encoding="utf-8").read()
@@ -115,7 +120,7 @@ def quarterly_to_daily(gdp_quarterly):
 
 
 def main():
-    stale_days = 20
+    stale_days = 1  # 页面上 TGA/RRP/IORB/SOFR 为日频，reserves.js 每天重建以跟上；WRESBAL 周频由 CSV 缓存控制
     if "--if-stale" in sys.argv:
         i = sys.argv.index("--if-stale")
         if i + 1 < len(sys.argv):
@@ -126,7 +131,7 @@ def main():
             print(f"[skip] reserves.js {age:.1f} 天前生成（阈值 {stale_days}）")
             return 0
 
-    raw = {sid: parse(fetch_csv(sid)) for sid in SERIES}
+    raw = {sid: parse(fetch_csv(sid, SERIES_MAX_AGE.get(sid, 20), force=(stale_days == 0))) for sid in SERIES}
     wres, tga, rrp = raw["WRESBAL"], raw["WTREGEN"], raw["RRPONTSYD"]
     if not wres:
         raise RuntimeError("WRESBAL empty")

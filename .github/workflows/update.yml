@@ -38,7 +38,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Fetch history (rates.js, monthly)
-        run: python fetch_history.py --if-stale 20
+        run: python fetch_history.py --if-stale 1
 
       - name: Fetch liquidity (liquidity.js, daily)
         timeout-minutes: 6
@@ -47,7 +47,7 @@ jobs:
           python fetch_liquidity.py --if-stale 1 || echo "[warn] fetch_liquidity 失败，沿用旧 liquidity.js"
 
       - name: Fetch reserves (reserves.js, weekly)
-        run: python fetch_reserves.py --if-stale 20 || echo "[warn] fetch_reserves 失败，沿用旧 reserves.js"
+        run: python fetch_reserves.py --if-stale 1 || echo "[warn] fetch_reserves 失败，沿用旧 reserves.js"
 
       - name: Fetch market data
         run: |
