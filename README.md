@@ -20,7 +20,12 @@ GitHub 仓库（代码镜像）：https://github.com/Hana-ame/market-watch （PU
 - nginx：`/etc/nginx/sites-enabled/watch-moonchan.conf`，`watch.moonchan.xyz` 直接对源站（Cloudflare DNS-only），TLS 复用 `*.moonchan.xyz` 泛域名证书，HTTP 自动 301 到 HTTPS。
 - 定时：systemd `market-watch.timer`，`OnCalendar=*-*-* 23:10:00 Asia/Shanghai`（`Persistent=true`，关机错过会补跑）→ `market-watch.service` 执行 `/var/www/market-watch/update.sh`。
 - 手动刷新：`ssh cloudcone 'systemctl start market-watch'`；页面数据在 `/var/www/market-watch/data.js`，页面每 60 秒自动重载。
-- 部署方式：把 `index.html` / `data.js` / `fetch_market.py` / `update.sh` 传到 `/var/www/market-watch` 即可；服务器已装 Python 3.11 + requests。
+- 部署方式：把以下文件传到 `/var/www/market-watch` 即可；服务器已装 Python 3.11 + requests。
+  - 页面：`index.html` / `cycle.html` / `liquidity.html` / `reserves.html`
+  - 抓数脚本：`fetch_market.py` / `fetch_history.py` / `fetch_liquidity.py` / `fetch_reserves.py`
+  - 调度：`update.sh`（服务器上由 systemd 每天 23:10 执行，须包含全部 4 个 fetch_* 调用）
+  - 数据缓存：`data/fred/*.csv`（FRED 序列，可选——脚本会现抓并落盘；缺省时首次运行会从 FRED 完整拉取）
+  - 生成产物 `data.js` / `rates.js` / `liquidity.js` / `reserves.js` 不入 git，由服务器每次刷新时生成。
 
 ## GitHub Pages 更新保障（备份链路）
 
