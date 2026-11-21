@@ -65,12 +65,27 @@ E:\market-watch\index.html
 **A股盘面**
 8 大指数（含 30 日走势）、涨跌家数与 13 档分布、情绪分与涨停/跌停/炸板、行业/概念板块、涨停梯队、自选股（A/HK/US）、成交额与情绪历史。
 
+## 美元流动性页（`liquidity.html`）
+
+与「利率 × 周期」互补：那页看货币政策的**价格**（利率、利差、通胀），这页看**数量**（市场上到底有多少活钱）。
+
+- **净流动性主图**：`WALCL − TGA − ON RRP`，单位统一为万亿美元，周频阶梯；给出 13 / 52 周变化与近 5 年分位。ON RRP 接近零时页面会显式标注「减项失效」，此时净流动性 ≈ `WALCL − TGA`。
+- **三件套分解**：美联储总资产（扩表注水 / 缩表抽水）、TGA（发债收税抽水、财政支出放水）、ON RRP（货币基金停泊的闲置现金）各自走势。
+- **资金价格**：`SOFR − IORB` 利差（回购融资相对准备金的溢价）、高收益债利差 `BAMLH0A0HYM2`、金融压力指数 `STLFSI4`、10 年期实际利率 `DFII10`。
+- **黄金 COT**：CFTC 管理基金净多头（黄金 088691）+ 总持仓，含 3 年分位与 4 周变化，用于看筹码是否拥挤。
+- **跨资产状态**：按当日方向判定「正常避险 / 流动性挤压 / 风险偏好 / 信号混合」。**股跌 + 债跌 + 金跌 + 美元涨** = 无差别变现换美元；**股跌 + 债涨** = 正常避险轮动。这只是事后分类，不是买卖信号。
+
+数据来自 FRED 公开 CSV（`fredgraph.csv`，无需 API key）与 CFTC Socrata API。频率并不一致，卡片上都标了各自的数据日期：净流动性周频（WALCL 周四更新，TGA/RRP 按周对齐取当时值），SOFR / 高收益利差为 T+1，`STLFSI4` 周频，`DTWEXBGS` 是日值但按周发布、约滞后一周，COT 每周五发布。
+
+更新方式：`python3 fetch_liquidity.py [--if-stale 1]`，产物 `liquidity.js`（`window.LIQ`）不入库，由 CI 生成后随 Pages 一并部署；FRED / CFTC 任一失败会沿用缓存或隐藏对应区块，不影响整站。
+
 ## 数据与刷新
 
 - **新浪财经**：`hq.sinajs.cn`（伦敦金 XAU、伦敦银 XAG、WTI、布伦特、沪金主连 AU0、上海原油 SC0、黄金 T+D、在岸 USD/CNY、USD/JPY、JPY/CNY）；`stock2.finance.sina.com.cn`（外盘与国内期货日线）。该接口必须带 `Referer: https://finance.sina.com.cn`，否则返回空。
 - **东方财富**：`push2`（A股、指数、美元指数 100.UDI、离岸人民币 133.USDCNH、自选股）、`push2his`（指数与外汇日线、国内期货主连日线：沪金 113.aum / 原油 142.scm / 沪铜 113.cum / 铁矿 114.im / 碳酸锂 225.lcm 等）、`push2ex`（涨停/跌停/炸板池）、`np-listapi`（7×24 快讯）。
 - **矿业期货**：国内 19 个品种用新浪 `nf_CU0`/`nf_RB0`/`nf_LC0`… 报价 + 东财主连日线；国际用新浪 `hf_CAD`（伦铜）/`hf_AHD`（伦铝）/`hf_ZSD`（伦锌）/`hf_HG`（COMEX 铜，美分/磅）。
 - 刷新节奏（已装）：WSL cron 工作日日盘 `09:00–14:55` 每 5 分钟、`15:00/15:05` 收盘；**夜间 `16:00–23:50` 与 `00:00–02:50`（周二至周六）每 10 分钟**覆盖国内夜盘与 LME/COMEX；Windows 计划任务 `MarketWatch-Refresh` 工作日 `09:20 / 15:10` 兜底。全量刷新约 2–4 秒（脚本显式绕过本机 HTTP 代理直连；走代理约 10 秒/请求）。
+- **FRED + CFTC（流动性页）**：`fredgraph.csv?id=...` 取 WALCL / WTREGEN / RRPONTSYD / SOFR / IORB / BAMLH0A0HYM2 / STLFSI4 / DFII10 / DTWEXBGS / M2SL / SP500 / DGS10；CFTC `publicreporting.cftc.gov` Socrata 取黄金管理基金持仓（合约 088691）。日内不刷新，随每日 CI 一次。
 - 手动刷新：双击 `update.bat`，或 `bash /mnt/e/market-watch/update.sh`。
 
 ## 折算公式
@@ -87,6 +102,11 @@ E:\market-watch\index.html
 |---|---|
 | `index.html` | 面板本体：纯静态，本地打开即可，无外部依赖/CDN |
 | `data.js` | 脚本生成的行情快照（`window.MKT = {...}`），页面每次加载它 |
+| `cycle.html` | 利率 × 周期页：FFR / 实际利率 / 10Y / 期限利差 / CPI / NBER 衰退 |
+| `rates.js` | 脚本生成的历史利率月度序列（`window.RATES`），`file://` 即可加载 |
+| `liquidity.html` | 美元流动性页：净流动性 / 三件套 / 资金价格 / 黄金 COT / 跨资产状态 |
+| `liquidity.js` | 脚本生成的流动性快照（`window.LIQ`），CI 生成不入库 |
+| `fetch_liquidity.py` | 取 FRED + CFTC，生成 `liquidity.js` |
 | `fetch_market.py` | 取数 + 统计 + 生成 `data.js` / `data/latest.json` / 历史 |
 | `update.sh` | 带文件锁的单次刷新入口（cron、计划任务、手动共用） |
 | `update.bat` | Windows 双击刷新（转调 WSL 的 update.sh） |
@@ -114,6 +134,8 @@ E:\market-watch\index.html
 - **内外盘口径**：LME 不含税，沪铜/沪铝含 13% 增值税，所以「沪铜 vs LME×汇率×1.13」才是同口径；国际铜 BC 是保税不含税价，直接对 LME×汇率比。COMEX 美铜单位是美分/磅（×2204.62 磅/吨 ÷100）。
 - **节假日**：用“指数 K 线日期 + 指数报价更新时间”识别；A股休市时标「休市（今日不开市）」。全球盘按“周一 06:00 – 周六 05:00”近似。
 - 页面依赖 `data.js` 与 `index.html` 同目录；单独拷走 HTML 会提示“还没有行情数据”。
+- **流动性页频率不一致**：净流动性周频、TGA/RRP 日频、SOFR 与高收益利差 T+1、STLFSI4 周频、美元指数滞后约一周。跨资产判定用的是各自最新可得值，所以四条信号的日期可能不同（卡片上已标）。
+- **CFTC 有网络限制**：部分网络访问 `publicreporting.cftc.gov` 会 403（境外 runner 正常）。本地取不到时沿用 `data/cot_gold.json` 缓存，无缓存则隐藏 COT 区块。
 
 ## 卸载定时任务
 

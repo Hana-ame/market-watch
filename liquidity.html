@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>美元流动性 × 黄金持仓</title>
+<style>
+  :root{
+    --bg:#070a0f; --panel:#0d141d; --panel-2:#111a25; --line:#1b2836; --line-2:#243546;
+    --text:#e7eef6; --muted:#8496a9; --dim:#5b6b7d;
+    --up:#ff4d5e; --down:#0ecb81; --gold:#f0b429; --blue:#4c8dff; --red:#ff5d6c; --violet:#a97bff;
+    --cyan:#37c9d8; --orange:#ff9f43;
+    --mono:"JetBrains Mono","SFMono-Regular","Cascadia Mono",Consolas,monospace;
+    --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{margin:0;padding:0}
+  body{background:
+      radial-gradient(1100px 520px at 10% -8%,rgba(76,141,255,.10),transparent 62%),
+      radial-gradient(900px 420px at 94% -6%,rgba(240,180,41,.08),transparent 60%),
+      var(--bg);
+    color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1480px;margin:0 auto;padding:22px 24px 44px}
+  .muted{color:var(--muted)} .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .up{color:var(--up)} .down{color:var(--down)}
+
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .mark{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;
+    background:linear-gradient(145deg,#152233,#121417);border:1px solid #24384f;color:var(--blue);font-size:20px;font-weight:700}
+  h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.5px;display:flex;align-items:baseline;gap:10px}
+  h1 .ver{font-size:11px;color:var(--dim);font-weight:400;letter-spacing:1px}
+  .meta-line{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .nav{display:flex;gap:8px;flex-wrap:wrap}
+  .back{font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--line-2);border-radius:8px;padding:6px 12px}
+  .back:hover{color:#fff;border-color:#3a5573}
+
+  .summary{border:1px solid var(--line);border-left:3px solid var(--blue);
+    background:linear-gradient(90deg,rgba(76,141,255,.08),rgba(13,20,29,.85) 42%);
+    border-radius:12px;padding:13px 18px;margin-bottom:14px;font-size:13.5px;line-height:1.85;color:#cbd8e6}
+  .summary b{color:#fff}
+
+  .stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:12px}
+  .stat{background:linear-gradient(180deg,#101923,#0c1219);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+  .stat .k{font-size:11px;color:var(--dim);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .v{font-family:var(--mono);font-size:21px;margin-top:4px;color:#fff;line-height:1.2;white-space:nowrap}
+  .stat .s{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .panel{background:linear-gradient(180deg,var(--panel),#0b1118);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+  .panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .panel-t{font-size:13px;font-weight:600;letter-spacing:.8px;color:#b9c8d8;display:flex;align-items:center;gap:8px}
+  .panel-t::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--blue);display:inline-block}
+  .panel-sub{font-size:11px;color:var(--dim);font-family:var(--mono)}
+
+  .chart-wrap{position:relative}
+  .chart-wrap svg{width:100%;height:auto;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .legend .li{display:flex;align-items:center;gap:6px}
+  .legend .li i{width:14px;height:3px;border-radius:2px;display:inline-block}
+  .tooltip{position:absolute;pointer-events:none;background:#0d1622;border:1px solid #2a3d54;border-radius:9px;
+    padding:8px 10px;font-size:11.5px;font-family:var(--mono);color:#cfdae7;box-shadow:0 8px 24px rgba(0,0,0,.5);
+    min-width:150px;z-index:5;white-space:nowrap}
+  .tooltip b{color:#fff;font-family:var(--sans);font-size:10.5px;letter-spacing:.5px}
+  .tooltip .r{display:flex;justify-content:space-between;gap:14px}
+
+  .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mini{background:linear-gradient(180deg,#0f1721,#0b1118);border:1px solid var(--line);border-radius:11px;padding:11px 12px 8px}
+  .mini-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+  .mini-t{font-size:12px;color:#b9c8d8;font-weight:600}
+  .mini-v{font-family:var(--mono);font-size:13px;color:#fff}
+  .mini-s{font-size:10.5px;color:var(--dim);margin-top:4px;font-family:var(--mono)}
+
+  .pbar{position:relative;height:8px;border-radius:5px;background:linear-gradient(90deg,#1b3a2a,#26303c 50%,#3a2026);margin:8px 0 4px;overflow:hidden}
+  .pbar i{position:absolute;top:-3px;width:3px;height:14px;border-radius:2px;background:#fff;box-shadow:0 0 0 1px #0b1118}
+  .pbar-l{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);font-family:var(--mono)}
+
+  .badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11px;border:1px solid}
+  .badge.warn{color:#ffd08a;border-color:#4a3a1c;background:rgba(240,180,41,.12)}
+  .badge.ok{color:#9fe3c5;border-color:#1d4034;background:rgba(14,203,129,.10)}
+  .badge.bad{color:#ffb3bb;border-color:#4a2027;background:rgba(255,77,94,.12)}
+  .badge.n{color:#a9c0d8;border-color:#26384b;background:rgba(76,141,255,.08)}
+
+  .sig{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+  .sig .c{background:#0f1721;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+  .sig .c .k{font-size:11px;color:var(--dim)}
+  .sig .c .v{font-family:var(--mono);font-size:16px;color:#fff;margin-top:3px}
+  .sig .c .d{font-size:11px;margin-top:2px}
+
+  .verdict{border:1px solid var(--line);border-radius:12px;padding:13px 16px;background:#0c131b;font-size:13px;line-height:1.8;color:#cbd8e6}
+  .verdict b{color:#fff}
+  .verdict .lbl{font-size:15px;font-weight:650;margin-right:8px}
+
+  table.t{width:100%;border-collapse:collapse;font-size:12px}
+  table.t th{text-align:right;font-size:10.5px;color:var(--dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table.t th:first-child,table.t td:first-child{text-align:left;padding-left:2px}
+  table.t td{text-align:right;padding:6px 8px;border-bottom:1px dashed rgba(27,40,54,.7);font-family:var(--mono);white-space:nowrap}
+  table.t tr:last-child td{border-bottom:none}
+  table.t td.nm{font-family:var(--sans);color:#c9d6e4}
+
+  .foot{font-size:11px;color:var(--dim);line-height:1.9;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .foot a{color:#8aa4c8}
+  .err{border:1px solid #3a2c18;background:#120f0a;color:#d9c7a8;border-radius:10px;padding:16px 18px;font-size:13px;margin-bottom:12px}
+
+  @media (max-width:1180px){
+    .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-3{grid-template-columns:1fr}
+    .sig{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @media (max-width:760px){
+    .wrap{padding:14px 12px 30px}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-2{grid-template-columns:1fr}
+    table.t{font-size:10.5px}
+    table.t th,table.t td{padding:5px 4px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">流</div>
+      <div>
+        <h1>美元流动性 × 黄金持仓<span class="ver">FRED + CFTC</span></h1>
+        <div class="meta-line">
+          <span id="asOf">—</span><span>·</span>
+          <span class="muted">净流动性 / TGA / ON RRP / SOFR / 高收益利差 / 金融压力 / 黄金 COT</span>
+        </div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a class="back" href="./cycle.html">← 利率 × 周期</a>
+      <a class="back" href="./index.html">← 回每日看盘</a>
+    </nav>
+  </header>
+
+  <div id="loadErr" class="err" hidden>流动性数据 <code>liquidity.js</code> 没有加载成功。请运行 <code>python3 fetch_liquidity.py</code>（或等 CI 生成）后刷新。</div>
+
+  <div class="summary" id="summary">正在加载流动性数据…</div>
+  <div class="stats" id="stats"></div>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">美元净流动性 = 美联储总资产 − TGA − ON RRP</div>
+      <div class="panel-sub" id="netSub">—</div>
+    </div>
+    <div class="chart-wrap" id="chartNet"></div>
+    <div class="legend">
+      <span class="li"><i style="background:#4c8dff"></i>净流动性（万亿美元，周频阶梯）</span>
+      <span class="li"><i style="background:rgba(76,141,255,.18)"></i>填充区</span>
+    </div>
+    <div style="margin-top:10px" id="netPct"></div>
+    <div style="margin-top:10px;font-size:11.5px;color:var(--muted)" id="netNote"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">三件套分解：水龙头 / 抽水 / 蓄水池</div>
+      <div class="panel-sub">WALCL 周频；TGA、ON RRP 日频（按周对齐取当时值）</div>
+    </div>
+    <div class="grid-3" id="components"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">资金价格：市场缺不缺钱</div>
+      <div class="panel-sub" id="rateSub">—</div>
+    </div>
+    <div class="grid-2" id="ratesGrid"></div>
+    <div style="margin-top:8px;font-size:11.5px;color:var(--muted)">SOFR−IORB 为正说明回购融资比存准备金更贵；HY 利差走阔、STLFSI4 上穿零轴是信用与压力同步恶化的信号。</div>
+  </section>
+
+  <section class="panel" id="cotPanel" hidden>
+    <div class="panel-h">
+      <div class="panel-t">黄金期货持仓（CFTC · 管理基金）</div>
+      <div class="panel-sub" id="cotSub">—</div>
+    </div>
+    <div class="grid-2" id="cotGrid"></div>
+    <div style="margin-top:8px;font-size:11.5px;color:var(--muted)">净多头 = 多头 − 空头（管理基金口径）。持仓拥挤时，一旦价格转向，减仓会放大跌幅——这正是流动性冲击里黄金"先被卖"的筹码背景。</div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">今日跨资产状态：正常避险，还是流动性挤压</div>
+      <div class="panel-sub" id="sigSub">—</div>
+    </div>
+    <div class="sig" id="signals"></div>
+    <div class="verdict" id="verdict">正在判定…</div>
+  </section>
+
+  <div class="foot">
+    数据：<a href="https://fred.stlouisfed.org/series/WALCL">FRED WALCL</a>、<a href="https://fred.stlouisfed.org/series/WTREGEN">WTREGEN</a>、
+    <a href="https://fred.stlouisfed.org/series/RRPONTSYD">RRPONTSYD</a>、<a href="https://fred.stlouisfed.org/series/SOFR">SOFR</a>、
+    <a href="https://fred.stlouisfed.org/series/IORB">IORB</a>、<a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2">BAMLH0A0HYM2</a>、
+    <a href="https://fred.stlouisfed.org/series/STLFSI4">STLFSI4</a>、<a href="https://fred.stlouisfed.org/series/DFII10">DFII10</a>、
+    <a href="https://fred.stlouisfed.org/series/DTWEXBGS">DTWEXBGS</a>、<a href="https://fred.stlouisfed.org/series/M2SL">M2SL</a>、
+    <a href="https://fred.stlouisfed.org/series/SP500">SP500</a>；<a href="https://publicreporting.cftc.gov/">CFTC COT</a>（黄金 088691，管理基金，周频，周五发布）。<br>
+    口径：净流动性单位为万亿美元，WALCL/TGA 原始为百万美元、ON RRP 为十亿美元，已统一换算。WALCL 周频（周四更新），因此曲线是阶梯状；TGA/ON RRP 取该周最后一个可得值。
+    美元指数 DTWEXBGS 为日值但按周发布，约滞后一周；SOFR、HY 利差为 T+1；STLFSI4 周频。<br>
+    本页的"状态判定"是基于当日涨跌方向的事后分类，用于解释资金去了哪里，不构成预测或投资建议。数据生成 <span id="genAt">—</span>。
+  </div>
+</div>
+
+<script src="liquidity.js"></script>
+<script src="data.js" onerror="window.__noMarket=1"></script>
+<script>
+(function(){
+  "use strict";
+  var L = window.LIQ;
+  if(!L){ document.getElementById('loadErr').hidden = false; document.getElementById('summary').textContent = "数据缺失"; return; }
+  var $ = function(id){ return document.getElementById(id); };
+
+  var W = 1180, ML = 52, MR = 14, MT = 14, MB = 24;
+
+  function fmt(v, d){ if(v===null||v===undefined||isNaN(v)) return "—"; return Number(v).toFixed(d===undefined?2:d); }
+  function sgn(v, d, unit){ if(v===null||v===undefined||isNaN(v)) return "—"; var s=Number(v).toFixed(d===undefined?2:d); return (v>0?"+":"")+s+(unit||""); }
+  function cls(v){ return v>0 ? "up" : (v<0 ? "down" : "muted"); }
+  function money(v){ return v===null||v===undefined ? "—" : "$"+Number(v).toFixed(3)+"T"; }
+
+  /* ---------- 通用折线图 ---------- */
+  function mkChart(el, cfg){
+    var labels = cfg.labels, series = cfg.series, n = labels.length;
+    if(!n){ el.innerHTML = '<div class="muted" style="padding:20px 0">无数据</div>'; return; }
+    var w = cfg.w || W, h = cfg.h || 320;
+    var ml = cfg.ml || ML, mr = cfg.mr || MR, mt = cfg.mt || MT, mb = cfg.mb || MB;
+
+    var vals = [];
+    series.forEach(function(s){ s.data.forEach(function(v){ if(v!==null && !isNaN(v)) vals.push(v); }); });
+    var lo = cfg.min !== undefined ? cfg.min : Math.min.apply(null, vals);
+    var hi = cfg.max !== undefined ? cfg.max : Math.max.apply(null, vals);
+    if(!isFinite(lo) || !isFinite(hi)){ lo = 0; hi = 1; }
+    if(hi === lo){ hi = lo + 1; }
+    var pad = (hi - lo) * 0.08;
+    lo -= pad; hi += pad;
+
+    function X(i){ return ml + (n === 1 ? 0 : i / (n - 1)) * (w - ml - mr); }
+    function Y(v){ return mt + (1 - (v - lo) / (hi - lo)) * (h - mt - mb); }
+
+    var out = ['<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'];
+    // 网格
+    var steps = 4;
+    for(var g=0; g<=steps; g++){
+      var v = lo + (hi - lo) * g / steps;
+      var yy = Y(v);
+      out.push('<line x1="'+ml+'" y1="'+yy.toFixed(1)+'" x2="'+(w-mr)+'" y2="'+yy.toFixed(1)+'" stroke="#16212e" stroke-width="1"/>');
+      out.push('<text x="'+(ml-8)+'" y="'+(yy+3.5).toFixed(1)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="end">'+
+        (cfg.yfmt ? cfg.yfmt(v) : fmt(v, cfg.dec===undefined?2:cfg.dec))+'</text>');
+    }
+    // 零轴
+    if(lo < 0 && hi > 0){
+      out.push('<line x1="'+ml+'" y1="'+Y(0).toFixed(1)+'" x2="'+(w-mr)+'" y2="'+Y(0).toFixed(1)+'" stroke="#3a4d63" stroke-width="1" stroke-dasharray="4 4"/>');
+    }
+    // x 轴年份
+    var seen = {};
+    for(var i=0;i<n;i++){
+      var y = String(labels[i]).slice(0,4);
+      if(!seen[y] && String(labels[i]).slice(5,10) <= "02"){
+        seen[y] = 1;
+        if(i > 0){
+          out.push('<line x1="'+X(i).toFixed(1)+'" y1="'+(h-mb)+'" x2="'+X(i).toFixed(1)+'" y2="'+(h-mb+4)+'" stroke="#2a3a4d"/>');
+          out.push('<text x="'+X(i).toFixed(1)+'" y="'+(h-7)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="middle">'+y+'</text>');
+        }
+      }
+    }
+    // 序列
+    series.forEach(function(s){
+      var d = "", pen = false;
+      for(var i=0;i<n;i++){
+        var v = s.data[i];
+        if(v===null || v===undefined || isNaN(v)){ pen = false; continue; }
+        d += (pen?"L":"M") + X(i).toFixed(1) + " " + Y(v).toFixed(1) + " ";
+        pen = true;
+      }
+      if(s.area && d){
+        var first = null, last = null;
+        for(var i2=0;i2<n;i2++){ var vv = s.data[i2]; if(vv!==null && vv!==undefined && !isNaN(vv)){ if(first===null) first=i2; last=i2; } }
+        if(first!==null){
+          var area = d + "L" + X(last).toFixed(1) + " " + Y(lo).toFixed(1) + " L" + X(first).toFixed(1) + " " + Y(lo).toFixed(1) + " Z";
+          out.push('<path d="'+area+'" fill="'+s.color+'" opacity=".10" stroke="none"/>');
+        }
+      }
+      out.push('<path d="'+d+'" fill="none" stroke="'+s.color+'" stroke-width="'+(s.width||1.8)+'" '+
+        (s.dash?'stroke-dasharray="'+s.dash+'" ':'')+'opacity="'+(s.opacity||1)+'"/>');
+      if(s.dot !== false){
+        for(var j=n-1;j>=0;j--){
+          var vv2 = s.data[j];
+          if(vv2!==null && vv2!==undefined && !isNaN(vv2)){
+            out.push('<circle cx="'+X(j).toFixed(1)+'" cy="'+Y(vv2).toFixed(1)+'" r="2.6" fill="'+s.color+'"/>');
+            break;
+          }
+        }
+      }
+    });
+    // 基准线
+    if(cfg.baseline !== undefined && cfg.baseline !== null){
+      out.push('<line x1="'+ml+'" y1="'+Y(cfg.baseline).toFixed(1)+'" x2="'+(w-mr)+'" y2="'+Y(cfg.baseline).toFixed(1)+'" stroke="#f0b429" stroke-width="1" stroke-dasharray="5 4" opacity=".65"/>');
+    }
+    if(cfg.hover !== false){
+      out.push('<line class="hvline" x1="-10" y1="'+mt+'" x2="-10" y2="'+(h-mb)+'" stroke="#8496a9" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>');
+    }
+    out.push('</svg>');
+    el.innerHTML = out.join("") + (cfg.hover === false ? "" : '<div class="tooltip" hidden></div>');
+
+    if(cfg.hover === false) return;
+    var svg = el.querySelector("svg"), tip = el.querySelector(".tooltip"), hv = el.querySelector(".hvline");
+    function idxAt(clientX){
+      var r = svg.getBoundingClientRect();
+      var rel = (clientX - r.left) / r.width * w;
+      var t = (rel - ml) / (w - ml - mr);
+      return Math.max(0, Math.min(n - 1, Math.round(t * (n - 1))));
+    }
+    el.addEventListener("mousemove", function(e){
+      var i = idxAt(e.clientX);
+      hv.setAttribute("x1", X(i)); hv.setAttribute("x2", X(i)); hv.setAttribute("opacity", "0.7");
+      var rows = "";
+      series.forEach(function(s){
+        rows += '<div class="r"><span>'+s.name+'</span><span>'+(s.fmt ? s.fmt(s.data[i]) : fmt(s.data[i], cfg.dec===undefined?2:cfg.dec))+'</span></div>';
+      });
+      tip.innerHTML = '<b>'+labels[i]+'</b>'+rows;
+      tip.hidden = false;
+      var r2 = el.getBoundingClientRect();
+      var px = (X(i) / w) * r2.width;
+      tip.style.left = Math.min(r2.width - 165, Math.max(6, px + 12)) + "px";
+      tip.style.top = "14px";
+    });
+    el.addEventListener("mouseleave", function(){ tip.hidden = true; hv.setAttribute("opacity", "0"); });
+  }
+
+  /* ---------- 顶部 ---------- */
+  var meta = L.meta, net = L.net, rates = L.rates, cur = rates.current, stat = net.stats, cot = L.cot;
+  var gold = (window.MKT && window.MKT.macro && window.MKT.macro.quotes && window.MKT.macro.quotes.xau) || null;
+
+  $("asOf").textContent = "净流动性截至 " + meta.net_as_of + " · 资金价格截至 " + (meta.rates_as_of || "—");
+  $("genAt").textContent = meta.generated_at;
+
+  var pctTxt = stat.pct5y===null ? "—" : Math.round(stat.pct5y*100)+"%";
+  var drained = net.rrp_drained && net.rrp_drained.drained;
+  var summaryBits = [];
+  summaryBits.push("<b>净流动性 " + money(stat.latest) + "</b>（13 周 " + sgn(stat.chg13,3,"T") + "，" + sgn(stat.chg52,3,"T") + "/年），处于近 5 年 <b>" + pctTxt + "</b> 分位");
+  if(drained) summaryBits.push("ON RRP 仅剩 <b>$" + fmt(net.rrp_drained.value_bn,2) + "B</b>——缓冲垫已耗尽，公式里的减项失效，净流动性基本等于 WALCL − TGA");
+  summaryBits.push("SOFR−IORB " + sgn(cur.spread,2,"pp") + "，" + (cur.spread!==null && cur.spread>0.05 ? "回购市场开始比准备金贵" : "回购融资尚无压力"));
+  summaryBits.push("高收益利差 " + fmt(cur.hy) + "%（日变 " + sgn(cur.hy_chg,2,"pp") + "），金融压力指数 " + fmt(cur.stlfsi,2));
+  if(gold) summaryBits.push("伦敦金当日 <span class='" + cls(gold.pct) + "'>" + sgn(gold.pct,2,"%") + "</span>，30 日 " + sgn(gold.ret30,1,"%"));
+  $("summary").innerHTML = "<b>一句话：</b>" + summaryBits.join("；") + "。";
+
+  function statCard(k, v, s, vc){
+    return '<div class="stat"><div class="k">'+k+'</div><div class="v '+(vc||"")+'">'+v+'</div><div class="s">'+s+'</div></div>';
+  }
+  $("stats").innerHTML =
+    statCard("净流动性", money(stat.latest), "5 年区间 " + money(stat.min5y) + " ~ " + money(stat.max5y)) +
+    statCard("13 周变化", sgn(stat.chg13,3,"T"), "周变 " + sgn(stat.wow,3,"T") + " / 52 周 " + sgn(stat.chg52,3,"T"), cls(stat.chg13)) +
+    statCard("5 年分位", pctTxt, "越低=池子越浅", stat.pct5y!==null && stat.pct5y<0.3 ? "up" : "") +
+    statCard("ON RRP", "$" + fmt(net.rrp_drained.value_bn,2) + "B", drained ? "已耗尽，减项失效" : "仍有缓冲", drained ? "up" : "") +
+    statCard("SOFR−IORB", sgn(cur.spread,2,"pp"), "SOFR " + fmt(cur.sofr) + "% / IORB " + fmt(cur.iorb) + "%", cur.spread!==null && cur.spread>0.05 ? "up" : "") +
+    statCard("高收益利差", fmt(cur.hy) + "%", "日变 " + sgn(cur.hy_chg,2,"pp") + " · 越低=信用越松");
+
+  /* ---------- 净流动性主图 ---------- */
+  mkChart($("chartNet"), {
+    labels: net.labels,
+    series: [{name:"净流动性", data: net.values, color:"#4c8dff", width:2, area:true,
+              fmt:function(v){ return money(v); }}],
+    h: 340, dec: 3, min: undefined, max: undefined,
+    yfmt: function(v){ return "$" + v.toFixed(1); }
+  });
+  $("netSub").textContent = net.labels.length + " 周 · " + net.labels[0] + " → " + net.labels[net.labels.length-1];
+
+  if(stat.pct5y !== null){
+    $("netPct").innerHTML =
+      '<div class="pbar"><i style="left:'+Math.max(0,Math.min(99.5, stat.pct5y*100))+'%"></i></div>' +
+      '<div class="pbar-l"><span>5 年最低 ' + money(stat.min5y) + '</span><span>当前 ' + money(stat.latest) + '</span><span>5 年最高 ' + money(stat.max5y) + '</span></div>';
+  }
+  $("netNote").textContent = drained
+    ? "注意：ON RRP 已接近零，未来净流动性的边际变化几乎只由 WALCL（扩表/缩表）和 TGA（发债/投放）决定，ON RRP 不再是缓冲。"
+    : "ON RRP 仍有余量：当它下降时，相当于把停泊在美联储的钱放回市场，会推高净流动性。";
+
+  /* ---------- 三件套 ---------- */
+  var comps = [
+    {id:"cWalcl", t:"美联储总资产 WALCL", s:"扩表=注水，缩表=抽水（周频）", data:net.walcl, color:"#4c8dff", dec:3, unit:"T", fmtDollar:true},
+    {id:"cTga", t:"财政部一般账户 TGA", s:"财政发债/收税把钱抽回（日频，按周对齐）", data:net.tga, color:"#ff9f43", dec:3, unit:"T", fmtDollar:true},
+    {id:"cRrp", t:"隔夜逆回购 ON RRP", s:"货币基金停泊的闲置现金（日频，按周对齐）", data:net.rrp, color:"#a97bff", dec:3, unit:"T", fmtDollar:true}
+  ];
+  $("components").innerHTML = comps.map(function(c){
+    return '<div class="mini"><div class="mini-h"><span class="mini-t">'+c.t+'</span>'+
+      '<span class="mini-v">'+money(c.data[c.data.length-1])+'</span></div>'+
+      '<div class="chart-wrap" id="'+c.id+'"></div>'+
+      '<div class="mini-s">'+c.s+'</div></div>';
+  }).join("");
+  comps.forEach(function(c){
+    mkChart($(c.id), {
+      labels: net.labels,
+      series: [{name:c.t, data:c.data, color:c.color, width:1.8, area:true, fmt:function(v){return money(v);}}],
+      w: 380, h: 150, ml: 44, mr: 8, mt: 8, mb: 18, dec: 3,
+      yfmt: function(v){ return "$" + v.toFixed(1); }
+    });
+  });
+
+  /* ---------- 资金价格 ---------- */
+  var rl = rates.labels;
+  var rateCards = [
+    {id:"rSofr", t:"SOFR − IORB 利差", v: sgn(cur.spread,2,"pp"), s:"融资成本相对准备金的溢价", data: rates.spread, color:"#37c9d8", dec:2, baseline:0,
+     note:"0 附近=资金面平稳；持续为正说明回购比存钱贵"},
+    {id:"rHy", t:"高收益债利差", v: fmt(cur.hy)+"%", s:"信用风险定价（越低越松）", data: rates.bamlh0a0hym2, color:"#ff5d6c", dec:2,
+     note:"走阔=信用收紧，危机前通常先动"},
+    {id:"rStl", t:"金融压力指数 STLFSI4", v: fmt(cur.stlfsi,2), s:"负值=低于均值压力", data: rates.stlfsi4, color:"#f0b429", dec:2, baseline:0,
+     note:"上穿零轴=压力高于历史均值"},
+    {id:"rReal", t:"10 年期实际利率", v: fmt(cur.real10)+"%", s:"黄金的机会成本", data: rates.dfii10, color:"#a97bff", dec:2,
+     note:"实际利率上行对金价不利"}
+  ];
+  $("ratesGrid").innerHTML = rateCards.map(function(c){
+    return '<div class="mini"><div class="mini-h"><span class="mini-t">'+c.t+'</span><span class="mini-v">'+c.v+'</span></div>'+
+      '<div class="chart-wrap" id="'+c.id+'"></div><div class="mini-s">'+c.s+'</div></div>';
+  }).join("");
+  rateCards.forEach(function(c){
+    mkChart($(c.id), {
+      labels: rl, series: [{name:c.t, data:c.data, color:c.color, width:1.6, fmt:function(v){return fmt(v, c.dec)+ (c.dec===2 && c.id!=="rStl" ? "%" : "");}}],
+      w: 560, h: 170, ml: 44, mr: 10, baseline: c.baseline, dec: c.dec
+    });
+  });
+  $("rateSub").textContent = (meta.rates_as_of || "—") + " · " + (rl.length ? rl.length + " 个交易日" : "无数据");
+
+  /* ---------- COT ---------- */
+  if(cot && cot.labels && cot.labels.length){
+    $("cotPanel").hidden = false;
+    var lt = cot.latest;
+    $("cotGrid").innerHTML = [
+      '<div class="mini"><div class="mini-h"><span class="mini-t">管理基金净多头</span><span class="mini-v">'+lt.net.toLocaleString()+' 手</span></div>'+
+        '<div class="chart-wrap" id="cCotNet"></div><div class="mini-s">多头 '+lt.long.toLocaleString()+' / 空头 '+lt.short.toLocaleString()+' · 4 周变化 '+(lt.chg4w>0?"+":"")+lt.chg4w.toLocaleString()+' 手</div></div>',
+      '<div class="mini"><div class="mini-h"><span class="mini-t">总持仓 OI 与净头寸占比</span><span class="mini-v">'+lt.share+'%</span></div>'+
+        '<div class="chart-wrap" id="cCotOi"></div><div class="mini-s">净多头 / 总持仓；占比过高=筹码拥挤</div></div>'
+    ].join("");
+    mkChart($("cCotNet"), {
+      labels: cot.labels, series: [{name:"净多头", data: cot.net, color:"#f0b429", width:1.8, area:true, fmt:function(v){return Math.round(v).toLocaleString();}}],
+      w: 560, h: 180, ml: 56, mr: 10, dec: 0, baseline: 0
+    });
+    mkChart($("cCotOi"), {
+      labels: cot.labels, series: [
+        {name:"总持仓", data: cot.oi, color:"#4c8dff", width:1.5, fmt:function(v){return Math.round(v).toLocaleString();}},
+        {name:"净多头", data: cot.net, color:"#f0b429", width:1.5, fmt:function(v){return Math.round(v).toLocaleString();}}
+      ], w: 560, h: 180, ml: 56, mr: 10, dec: 0
+    });
+    $("cotSub").textContent = lt.date + " · 3 年分位 " + (lt.pct3y===null?"—":Math.round(lt.pct3y*100)+"%") + (cot.source==="cache" ? " · 缓存数据" : "");
+  } else {
+    $("cotPanel").hidden = true;
+  }
+
+  /* ---------- 跨资产状态 ---------- */
+  var spxPct = cur.spx_pct, yieldBp = cur.dgs10_bp, goldPct = gold ? gold.pct : null, dxyChg = cur.dxy_chg;
+  function dir(v, eps){
+    if(v===null||v===undefined||isNaN(v)) return 0;
+    if(v > eps) return 1;
+    if(v < -eps) return -1;
+    return 0;
+  }
+  var sStock = dir(spxPct===null?null:-spxPct, 0.3);   // 1=股跌（风险规避方向）
+  var sBond  = dir(yieldBp===null?null:yieldBp, 2);     // 1=收益率上行（债跌）
+  var sGold  = dir(goldPct===null?null:-goldPct, 0.3);  // 1=金跌
+  var sDollar= dir(dxyChg, 0.1);                        // 1=美元涨
+
+  function sigCard(k, v, d, arrow){
+    var c = arrow>0 ? "up" : (arrow<0 ? "down" : "muted");
+    return '<div class="c"><div class="k">'+k+'</div><div class="v '+c+'">'+v+'</div><div class="d muted">'+d+'</div></div>';
+  }
+  $("signals").innerHTML =
+    sigCard("美股 SP500", (spxPct===null?"—":sgn(spxPct,2,"%")), spxPct===null?"无数据":"日涨跌（"+(cur.spx_as_of||"")+"）", spxPct===null?0:spxPct) +
+    sigCard("美债 10Y 收益率", (yieldBp===null?"—":sgn(yieldBp,1,"bp")), yieldBp===null?"无数据":"上行=债券价格下跌", yieldBp===null?0:yieldBp) +
+    sigCard("黄金 XAU", (goldPct===null?"—":sgn(goldPct,2,"%")), goldPct===null?"未加载 data.js":(gold && gold.ret30!==null ? "30 日 "+sgn(gold.ret30,1,"%") : "日涨跌"), goldPct===null?0:goldPct) +
+    sigCard("美元指数", (dxyChg===null?"—":sgn(dxyChg,3,"")), dxyChg===null?"无数据":"周发布，约滞后一周（"+(cur.dxy_as_of||"")+"）", dxyChg===null?0:dxyChg);
+
+  var verdict, vClass;
+  if(sStock===1 && sBond===1 && (sGold===1 || goldPct===null) && sDollar===1){
+    vClass = "bad";
+    verdict = "<span class='lbl' style='color:#ff6b78'>流动性挤压嫌疑（Cash is King）</span>股跌 + 债跌 + 金跌 + 美元涨：资金不是在避险轮动，而是在无差别变现换美元。历史上这种组合多出现在危机急性期，之后一旦央行注入流动性，黄金往往率先反弹。";
+  } else if(sStock===1 && sBond===-1){
+    vClass = "ok";
+    verdict = "<span class='lbl' style='color:#5ddfa8'>正常避险（Risk-Off）</span>股跌 + 收益率下行：资金在向国债等安全资产轮动，而不是缺美元。此时黄金即使回调，也属于获利了结而非踩踏。";
+  } else if(sStock===-1){
+    vClass = "n";
+    verdict = "<span class='lbl' style='color:#8fb6ff'>风险偏好（Risk-On）</span>美股上涨，避险需求不高。关注的是流动性是否在支撑估值：净流动性处于低分位时，涨势对资金面更敏感。";
+  } else {
+    vClass = "warn";
+    verdict = "<span class='lbl' style='color:#ffd08a'>信号混合</span>四个方向没有形成一致信号（股/债/金/美元分歧），说明市场仍在选择方向，不宜用单日数据下结论。";
+  }
+  var lagNote = " 数据口径：SP500 与 10Y 为 T+1，黄金取自同站每日快照，美元指数按周发布。";
+  $("verdict").innerHTML = verdict + "<span class='muted'>" + lagNote + "</span>";
+  $("sigSub").textContent = "股 " + (sStock===1?"↓":(sStock===-1?"↑":"—")) +
+    " · 债 " + (sBond===1?"↓":(sBond===-1?"↑":"—")) +
+    " · 金 " + (sGold===1?"↓":(sGold===-1?"↑":"—")) +
+    " · 美元 " + (sDollar===1?"↑":(sDollar===-1?"↓":"—")) +
+    (gold ? "" : " · 黄金数据未加载");
+
+  /* ---------- 降级提示 ---------- */
+  if(meta.degraded && meta.degraded.length){
+    $("netNote").textContent += " ｜ 降级：" + meta.degraded.join("；");
+  }
+})();
+</script>
+</body>
+</html>
