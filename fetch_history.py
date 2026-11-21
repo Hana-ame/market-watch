@@ -29,7 +29,8 @@ CACHE = os.path.join(DATA, "fred")
 OUT = os.path.join(ROOT, "rates.js")
 SESSION = requests.Session()
 SESSION.trust_env = False
-SESSION.headers.update({"User-Agent": "Mozilla/5.0 market-watch/1.0"})
+# 注意：不要覆盖 User-Agent。FRED 对自定义 UA（含伪装浏览器）会长时间挂住不返回，
+# 默认的 python-requests/x 反而能在 1s 内拿到 CSV；覆盖 UA 会让缓存过期后的重抓卡死。
 
 SERIES = {
     "FEDFUNDS": "联邦基金有效利率",
