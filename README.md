@@ -79,6 +79,20 @@ E:\market-watch\index.html
 
 更新方式：`python3 fetch_liquidity.py [--if-stale 1]`，产物 `liquidity.js`（`window.LIQ`）不入库，由 CI 生成后随 Pages 一并部署；FRED / CFTC 任一失败会沿用缓存或隐藏对应区块，不影响整站。
 
+## 银行准备金页（`reserves.html`）
+
+与「美元流动性」互补：那页看**钱的总量**（净流动性 = WALCL − TGA − ON RRP），这页看**银行手里还剩多少活钱**（准备金 = 商业银行在美联储账上的结算弹药）。
+
+- **准备金 vs 安全线主图**：`WRESBAL`（美联储 H.4.1 每周三读数）叠加「安全线 = 年化名义 GDP × 10%」，低于安全线的区间用紫色带标出。华尔街经验口径：准备金 ≥ GDP 的 10%（近年约 3 万亿美元）才算充裕。
+- **占年化 GDP（%）**：准备金 / 年化 GDP 的百分位曲线，10% 安全线为虚线。
+- **TGA + ON RRP**：财政部一般账户 `WDTGAL` 与隔夜逆回购 `WLRRAL` 走势——TGA 上升抽水、下降放水；ON RRP 是货币基金停泊的闲钱，接近零意味着「蓄水池见底」。
+- **关键事件标记**：2019-09 钱荒（准备金低点）、2020-03 疫情 QE、2021-12 Taper、2022-06 QT 缩表、2025-10 TGA 重建。
+- **怎么读 / 当前读数 / 关键历史节点**：准备金是回购市场的弹药，跌破安全线 → 银行惜贷 → 短期利率飙涨 → 股债金无差别抛售（2019-09 前车之鉴）。
+
+数据来自 FRED 公开 CSV（`fredgraph.csv`，无需 API key）：`WRESBAL` / `WDTGAL` / `WLRRAL`（均为百万美元，周频）+ `GDP`（季度，插值成日度后取年化）。安全线 = 年化 GDP × 10%。
+
+更新方式：`python3 fetch_reserves.py [--if-stale 20]`，产物 `reserves.js`（`window.RESERVES`）不入库，由 CI 生成后随 Pages 一并部署。
+
 ## 数据与刷新
 
 - **新浪财经**：`hq.sinajs.cn`（伦敦金 XAU、伦敦银 XAG、WTI、布伦特、沪金主连 AU0、上海原油 SC0、黄金 T+D、在岸 USD/CNY、USD/JPY、JPY/CNY）；`stock2.finance.sina.com.cn`（外盘与国内期货日线）。该接口必须带 `Referer: https://finance.sina.com.cn`，否则返回空。
@@ -86,6 +100,7 @@ E:\market-watch\index.html
 - **矿业期货**：国内 19 个品种用新浪 `nf_CU0`/`nf_RB0`/`nf_LC0`… 报价 + 东财主连日线；国际用新浪 `hf_CAD`（伦铜）/`hf_AHD`（伦铝）/`hf_ZSD`（伦锌）/`hf_HG`（COMEX 铜，美分/磅）。
 - 刷新节奏（已装）：WSL cron 工作日日盘 `09:00–14:55` 每 5 分钟、`15:00/15:05` 收盘；**夜间 `16:00–23:50` 与 `00:00–02:50`（周二至周六）每 10 分钟**覆盖国内夜盘与 LME/COMEX；Windows 计划任务 `MarketWatch-Refresh` 工作日 `09:20 / 15:10` 兜底。全量刷新约 2–4 秒（脚本显式绕过本机 HTTP 代理直连；走代理约 10 秒/请求）。
 - **FRED + CFTC（流动性页）**：`fredgraph.csv?id=...` 取 WALCL / WTREGEN / RRPONTSYD / SOFR / IORB / BAMLH0A0HYM2 / STLFSI4 / DFII10 / DTWEXBGS / M2SL / SP500 / DGS10；CFTC `publicreporting.cftc.gov` Socrata 取黄金管理基金持仓（合约 088691）。日内不刷新，随每日 CI 一次。
+- **FRED（准备金页）**：`fredgraph.csv?id=...` 取 WRESBAL / WDTGAL / WLRRAL / GDP；周频，随 update.sh 每轮跑（`--if-stale 20`，即最多每 20 天强制刷新一次）。
 - 手动刷新：双击 `update.bat`，或 `bash /mnt/e/market-watch/update.sh`。
 
 ## 折算公式
@@ -107,6 +122,9 @@ E:\market-watch\index.html
 | `liquidity.html` | 美元流动性页：净流动性 / 三件套 / 资金价格 / 黄金 COT / 跨资产状态 |
 | `liquidity.js` | 脚本生成的流动性快照（`window.LIQ`），CI 生成不入库 |
 | `fetch_liquidity.py` | 取 FRED + CFTC，生成 `liquidity.js` |
+| `reserves.html` | 银行准备金页：准备金 vs 安全线 / 占 GDP / TGA + ON RRP / 关键事件 |
+| `reserves.js` | 脚本生成的准备金快照（`window.RESERVES`），CI 生成不入库 |
+| `fetch_reserves.py` | 取 FRED WRESBAL / WDTGAL / WLRRAL + GDP，生成 `reserves.js` |
 | `fetch_market.py` | 取数 + 统计 + 生成 `data.js` / `data/latest.json` / 历史 |
 | `update.sh` | 带文件锁的单次刷新入口（cron、计划任务、手动共用） |
 | `update.bat` | Windows 双击刷新（转调 WSL 的 update.sh） |

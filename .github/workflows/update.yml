@@ -46,6 +46,9 @@ jobs:
           # FRED + CFTC；脚本内部有抓取预算与 curl 优先策略，任一源失败都不阻断整站发布
           python fetch_liquidity.py --if-stale 1 || echo "[warn] fetch_liquidity 失败，沿用旧 liquidity.js"
 
+      - name: Fetch reserves (reserves.js, weekly)
+        run: python fetch_reserves.py --if-stale 20 || echo "[warn] fetch_reserves 失败，沿用旧 reserves.js"
+
       - name: Fetch market data
         run: |
           # 东财对境外 runner 偶发整段 502：整轮重试最多 3 次，失败也尽量由兜底快照兜住
@@ -97,8 +100,9 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p site
-          cp index.html cycle.html liquidity.html README.md data.js rates.js site/
+          cp index.html cycle.html liquidity.html reserves.html README.md data.js rates.js site/
           cp liquidity.js site/ 2>/dev/null || echo "[warn] liquidity.js 缺失，liquidity.html 将提示数据未加载"
+          cp reserves.js site/ 2>/dev/null || echo "[warn] reserves.js 缺失，reserves.html 将提示数据未加载"
           ls -la site
 
       - name: Configure Pages

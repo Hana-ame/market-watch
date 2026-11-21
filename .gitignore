@@ -2,6 +2,7 @@
 data.js
 rates.js
 liquidity.js
+reserves.js
 data/cot_gold.json
 data/latest.json
 data/history.local.json

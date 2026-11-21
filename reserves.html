@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>银行体系准备金 · 安全线 / 占 GDP / TGA / ON RRP</title>
+<style>
+  :root{
+    --bg:#070a0f; --panel:#0d141d; --panel-2:#111a25; --line:#1b2836; --line-2:#243546;
+    --text:#e7eef6; --muted:#8496a9; --dim:#5b6b7d;
+    --up:#ff4d5e; --down:#0ecb81; --gold:#f0b429; --blue:#4c8dff; --red:#ff5d6c; --violet:#a97bff;
+    --mono:"JetBrains Mono","SFMono-Regular","Cascadia Mono",Consolas,monospace;
+    --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{margin:0;padding:0}
+  body{background:
+      radial-gradient(1100px 520px at 12% -8%,rgba(76,141,255,.10),transparent 62%),
+      radial-gradient(900px 420px at 92% -6%,rgba(240,180,41,.07),transparent 60%),
+      var(--bg);
+    color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1480px;margin:0 auto;padding:22px 24px 44px}
+  .muted{color:var(--muted)} .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .up{color:var(--up)} .down{color:var(--down)}
+
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .mark{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;
+    background:linear-gradient(145deg,#14202c,#121417);border:1px solid #24405c;color:var(--blue);font-size:20px;font-weight:700}
+  h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.5px;display:flex;align-items:baseline;gap:10px}
+  h1 .ver{font-size:11px;color:var(--dim);font-weight:400;letter-spacing:1px}
+  .meta-line{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .nav{display:flex;gap:8px;flex-wrap:wrap}
+  .back{font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--line-2);border-radius:8px;padding:6px 12px}
+  .back:hover{color:#fff;border-color:#3a5573}
+
+  .summary{border:1px solid var(--line);border-left:3px solid var(--blue);
+    background:linear-gradient(90deg,rgba(76,141,255,.08),rgba(13,20,29,.85) 42%);
+    border-radius:12px;padding:13px 18px;margin-bottom:14px;font-size:13.5px;line-height:1.8;color:#cbd8e6}
+  .summary b{color:#fff}
+  .summary .warn{color:var(--gold)} .summary .danger{color:var(--red)}
+
+  .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+  .stat{background:linear-gradient(180deg,#101923,#0c1219);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat .k{font-size:11px;color:var(--dim);letter-spacing:.5px}
+  .stat .v{font-family:var(--mono);font-size:21px;margin-top:4px;color:#fff;line-height:1.2}
+  .stat .s{font-size:11px;color:var(--muted);margin-top:2px}
+  .stat .v.low{color:var(--gold)} .stat .v.danger{color:var(--red)}
+
+  .panel{background:linear-gradient(180deg,var(--panel),#0b1118);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+  .panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .panel-t{font-size:13px;font-weight:600;letter-spacing:.8px;color:#b9c8d8;display:flex;align-items:center;gap:8px}
+  .panel-t::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--blue);display:inline-block}
+  .panel-sub{font-size:11px;color:var(--dim);font-family:var(--mono)}
+
+  .chart-wrap{position:relative}
+  .chart-wrap svg{width:100%;height:auto;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .legend .li{display:flex;align-items:center;gap:6px}
+  .legend .li i{width:14px;height:3px;border-radius:2px;display:inline-block}
+  .tooltip{position:absolute;pointer-events:none;background:#0d1622;border:1px solid #2a3d54;border-radius:9px;
+    padding:8px 10px;font-size:11.5px;font-family:var(--mono);color:#cfdae7;box-shadow:0 8px 24px rgba(0,0,0,.5);
+    min-width:170px;z-index:5;white-space:nowrap}
+  .tooltip b{color:#fff;font-family:var(--sans);font-size:10.5px;letter-spacing:.5px}
+  .tooltip .r{display:flex;justify-content:space-between;gap:14px}
+
+  .grid-2{display:grid;grid-template-columns:1.5fr 1fr;gap:12px}
+  .grid-2 > .panel{margin-bottom:0}
+
+  .findings{list-style:none;margin:0;padding:0}
+  .findings li{padding:9px 0;border-bottom:1px dashed rgba(27,40,54,.8);font-size:13px;line-height:1.7}
+  .findings li:last-child{border-bottom:none}
+  .findings .n{font-family:var(--mono);color:var(--blue);margin-right:6px;font-size:11.5px}
+  .findings b{color:#fff}
+
+  table.t{width:100%;border-collapse:collapse;font-size:12px}
+  table.t th{text-align:right;font-size:10.5px;color:var(--dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table.t th:first-child,table.t td:first-child{text-align:left;padding-left:2px}
+  table.t td{text-align:right;padding:6px 8px;border-bottom:1px dashed rgba(27,40,54,.7);font-family:var(--mono);white-space:nowrap}
+  table.t tr:last-child td{border-bottom:none}
+  table.t tr:hover td{background:#0f1822}
+  table.t td.nm{font-family:var(--sans);color:#c9d6e4}
+
+  .foot{font-size:11px;color:var(--dim);line-height:1.9;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .foot a{color:#8aa4c8}
+  .err{border:1px solid #3a2c18;background:#120f0a;color:#d9c7a8;border-radius:10px;padding:16px 18px;font-size:13px;margin-bottom:12px}
+  .badge{display:inline-block;font-size:10.5px;border-radius:6px;padding:2px 8px;border:1px solid var(--line-2);color:var(--muted);margin-left:6px;vertical-align:1px}
+  .badge.warn{color:var(--gold);border-color:#6b5418}
+  .badge.danger{color:var(--red);border-color:#6b2430}
+
+  @media (max-width:1080px){
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-2{grid-template-columns:1fr}
+  }
+  @media (max-width:640px){
+    .wrap{padding:14px 12px 30px}
+    table.t{font-size:10.5px}
+    table.t th,table.t td{padding:5px 4px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">备</div>
+      <div>
+        <h1>银行体系准备金<span class="ver">2002–2026 · 美联储 H.4.1 · FRED</span></h1>
+        <div class="meta-line">
+          <span id="asOf">—</span><span>·</span>
+          <span class="muted">银行准备金 / 占 GDP 安全线 / 财政部 TGA / 隔夜逆回购 ON RRP</span>
+        </div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a class="back" href="./liquidity.html">← 美元流动性</a>
+      <a class="back" href="./cycle.html">利率 × 周期</a>
+      <a class="back" href="./index.html">← 回每日看盘</a>
+    </nav>
+  </header>
+
+  <div id="loadErr" class="err" hidden>准备金数据 <code>reserves.js</code> 没有加载成功。请运行 <code>python3 fetch_reserves.py</code>（或等 update.sh 自动生成）后刷新。</div>
+
+  <div class="summary" id="summary">正在加载准备金数据…</div>
+  <div class="stats" id="stats"></div>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">银行准备金 vs 安全线（10% GDP）</div>
+      <div class="panel-sub" id="chartResSub">—</div>
+    </div>
+    <div class="chart-wrap" id="chartReserves"></div>
+    <div class="legend">
+      <span class="li"><i style="background:#4c8dff"></i>银行准备金（万亿美元）</span>
+      <span class="li"><i style="background:#f0b429"></i>安全线 = 名义 GDP × 10%</span>
+      <span class="li"><i style="background:rgba(169,123,255,.6)"></i>准备金低于安全线</span>
+      <span class="li"><i style="background:rgba(140,150,170,.35)"></i>关键事件</span>
+    </div>
+    <div class="panel-sub" style="margin-top:8px">华尔街经验口径：准备金 ≥ GDP 的 10%（约 3 万亿美元）才算充裕；低于即进入流动性枯竭警戒区。</div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">准备金占年化 GDP（%）</div>
+      <div class="panel-sub" id="chartPctSub">—</div>
+    </div>
+    <div class="chart-wrap" id="chartPct"></div>
+    <div class="legend">
+      <span class="li"><i style="background:#4c8dff"></i>准备金 / 年化 GDP</span>
+      <span class="li"><i style="background:#f0b429"></i>10% 安全线</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">财政部 TGA 与隔夜逆回购 ON RRP</div>
+      <div class="panel-sub" id="chartTgaSub">—</div>
+    </div>
+    <div class="chart-wrap" id="chartTga"></div>
+    <div class="legend">
+      <span class="li"><i style="background:#0ecb81"></i>财政部 TGA 余额</span>
+      <span class="li"><i style="background:#a97bff"></i>隔夜逆回购 ON RRP 余额</span>
+      <span class="li"><i style="background:rgba(140,150,170,.35)"></i>关键事件</span>
+    </div>
+    <div class="panel-sub" style="margin-top:8px">TGA 上升 = 财政部回笼资金（收紧）；ON RRP 上升 = 资金回流美联储（收紧），二者下降 = 释放流动性。</div>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-h"><div class="panel-t">怎么读这套数据</div></div>
+      <ul class="findings" id="findings"></ul>
+    </section>
+    <section class="panel">
+      <div class="panel-h"><div class="panel-t">当前读数</div><div class="panel-sub" id="curSub">—</div></div>
+      <ul class="findings" id="currentBox"></ul>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="panel-t">关键历史节点</div>
+      <div class="panel-sub">2002 年以来准备金 / RRP 的极值与触发事件</div>
+    </div>
+    <div style="overflow-x:auto"><table class="t" id="histTable"></table></div>
+  </section>
+
+  <div class="foot">
+    数据：<a href="https://fred.stlouisfed.org/series/WRESBAL">FRED WRESBAL</a>（银行准备金）、
+    <a href="https://fred.stlouisfed.org/series/WDTGAL">WDTGAL</a>（财政部 TGA）、
+    <a href="https://fred.stlouisfed.org/series/WLRRAL">WLRRAL</a>（隔夜逆回购 ON RRP）、
+    <a href="https://fred.stlouisfed.org/series/GDP">GDP</a>（名义，季度）。<br>
+    口径：准备金 / TGA / RRP 取美联储 H.4.1 每周三读数（百万美元）；GDP 季度值线性插值成日度后取年化；安全线 = 年化 GDP × 10%。<br>
+    准备金 = 商业银行在美联储账上的「活钱」，是回购市场结算的底层；跌破安全线曾于 2019-09 引发钱荒。本页为数据观察，不构成投资建议。数据生成 <span id="genAt">—</span>。
+  </div>
+</div>
+
+<script src="reserves.js"></script>
+<script>
+(function(){
+  "use strict";
+  var L = window.RESERVES;
+  if(!L){ document.getElementById('loadErr').hidden = false; document.getElementById('summary').textContent = "数据缺失"; return; }
+  var $ = function(id){ return document.getElementById(id); };
+
+  function fmt(v, d){ if(v===null||v===undefined||isNaN(v)) return "—"; return Number(v).toFixed(d===undefined?2:d); }
+  function trl(v){ if(v===null||v===undefined||isNaN(v)) return "—"; return (v>0?"+":"")+ (v/1e6).toFixed(2) + " 万亿"; }
+  function tn(v){ if(v===null||v===undefined||isNaN(v)) return "—"; return (v/1e6).toFixed(2) + " 万亿"; }
+  function dateCN(d){ return d ? d.slice(0,4)+"年"+parseInt(d.slice(5,7),10)+"月"+parseInt(d.slice(8,10),10)+"日" : "—"; }
+  function dateMD(d){ return d ? d.slice(5,7)+"-"+d.slice(8,10) : "—"; }
+
+  var Lb = L.labels, S = L.series, N = Lb.length, lat = L.latest;
+  var idxOf = {}; Lb.forEach(function(d,i){ idxOf[d]=i; });
+
+  $("asOf").textContent = "数据截至 " + dateCN(lat.date) + " · 共 " + N + " 周 · " + Lb[0].slice(0,4) + " 起";
+  $("genAt").textContent = L.generated_at;
+
+  var low = lat.pct_gdp < L.config.safe_gdp_pct;
+  var cls = lat.pct_gdp < L.config.safe_gdp_pct - 1.5 ? "danger" : (low ? "low" : "");
+  var badge = low ? '<span class="badge warn">低于安全线</span>' : '<span class="badge">高于安全线</span>';
+  if(lat.pct_gdp < L.config.safe_gdp_pct - 1.5) badge = '<span class="badge danger">深度警戒</span>';
+
+  $("summary").innerHTML = "<b>一句话：</b>银行准备金 <b>" + tn(lat.reserves) + "</b>，占年化 GDP <b class='" + cls + "'>" +
+    fmt(lat.pct_gdp) + "%</b>" + badge + "（安全线 " + L.config.safe_gdp_pct + "% = " + tn(lat.safe_line) + "，" +
+    (lat.gap>=0 ? "高于安全线 " + tn(lat.gap) : "低于安全线 " + tn(-lat.gap)) + "）；" +
+    "近 4 周准备金 <b class='" + (lat.chg_4w_reserves>=0?"up":"down") + "'>" + trl(lat.chg_4w_reserves) + "</b>，TGA <b>" +
+    trl(lat.chg_4w_tga) + "</b>，ON RRP <b>" + trl(lat.chg_4w_rrp) + "</b>。" +
+    (low ? "<span class='warn'>准备金已跌破 10% 安全线，若继续下探将压缩银行在回购市场放钱的能力（2019-09 前车之鉴）。</span>" :
+           "<span class='warn'>准备金仍在安全线上方，短期未见流动性枯竭信号。</span>");
+
+  function stat(k, v, s, extraCls){ return '<div class="stat"><div class="k">'+k+'</div><div class="v '+(extraCls||'')+'">'+v+'</div><div class="s">'+s+'</div></div>'; }
+  $("stats").innerHTML =
+    stat("银行准备金", tn(lat.reserves), "H.4.1 截至 " + dateMD(lat.date), cls) +
+    stat("占年化 GDP", fmt(lat.pct_gdp) + "%", "安全线 " + L.config.safe_gdp_pct + "%（" + tn(lat.safe_line) + "）", cls) +
+    stat("财政部 TGA", tn(lat.tga), "4 周 " + trl(lat.chg_4w_tga)) +
+    stat("ON RRP", tn(lat.rrp), "4 周 " + trl(lat.chg_4w_rrp));
+
+  /* ---------- 图表公共 ---------- */
+  var W = 1180, ML = 52, MR = 14, MT = 14, MB = 26;
+
+  // 准备金图（万亿）
+  var H1 = 360, yMax1 = 4.6, yMin1 = 0;
+  function x(i){ return ML + i / (N - 1) * (W - ML - MR); }
+  function y1(v){ return MT + (1 - (v/1e6 - yMin1) / (yMax1 - yMin1)) * (H1 - MT - MB); }
+
+  var belowRuns = [], cur = null;
+  for(var i=0;i<N;i++){
+    var bel = S.reserves[i] !== null && L.safe_line[i] !== null && S.reserves[i] < L.safe_line[i];
+    if(bel && cur === null) cur = i;
+    if(!bel && cur !== null){ belowRuns.push([cur, i-1]); cur = null; }
+  }
+  if(cur !== null) belowRuns.push([cur, N-1]);
+
+  function band(x1, x2, fill){ return '<rect x="'+x1.toFixed(1)+'" y="'+MT+'" width="'+Math.max(0.5,x2-x1).toFixed(1)+'" height="'+(H1-MT-MB)+'" fill="'+fill+'"/>'; }
+  function linePath(arr, yfn){
+    var d = "", pen = false;
+    for(var j=0;j<N;j++){
+      var v = arr[j];
+      if(v === null || v === undefined || isNaN(v)){ pen = false; continue; }
+      d += (pen ? "L" : "M") + x(j).toFixed(1) + " " + yfn(v).toFixed(1) + " ";
+      pen = true;
+    }
+    return d;
+  }
+  function gridAndAxis(yfn, H, yVals, labelsFn){
+    var out = [];
+    yVals.forEach(function(vv){
+      out.push('<line x1="'+ML+'" y1="'+yfn(vv).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+yfn(vv).toFixed(1)+'" stroke="#16212e" stroke-width="1"/>');
+      out.push('<text x="'+(ML-8)+'" y="'+(yfn(vv)+3.5).toFixed(1)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="end">'+labelsFn(vv)+'</text>');
+    });
+    for(var yr=2003; yr<=2026; yr+=4){
+      var mi = Lb.indexOf(yr+"-01-01");
+      if(mi<0) continue;
+      out.push('<line x1="'+x(mi).toFixed(1)+'" y1="'+(H-MB)+'" x2="'+x(mi).toFixed(1)+'" y2="'+(H-MB+4)+'" stroke="#2a3a4d"/>');
+      out.push('<text x="'+x(mi).toFixed(1)+'" y="'+(H-8)+'" fill="#5b6b7d" font-size="10" font-family="monospace" text-anchor="middle">'+yr+'</text>');
+    }
+    return out.join("");
+  }
+  function eventMarkers(){
+    var out = [];
+    (L.events||[]).forEach(function(ev){
+      var mi = idxOf[ev.date];
+      if(mi===undefined) return;
+      out.push('<line x1="'+x(mi).toFixed(1)+'" y1="'+MT+'" x2="'+x(mi).toFixed(1)+'" y2="'+(H1-MB)+'" stroke="#8496a9" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>');
+      out.push('<text x="'+x(mi).toFixed(1)+'" y="'+(MT+11)+'" fill="#8496a9" font-size="9.5" font-family="monospace" text-anchor="middle" opacity=".85">'+ev.label+'</text>');
+    });
+    return out.join("");
+  }
+
+  // 图 1：准备金 vs 安全线
+  var svg1 = ['<svg viewBox="0 0 '+W+' '+H1+'" preserveAspectRatio="none">'];
+  belowRuns.forEach(function(r){ svg1.push(band(x(r[0]), x(r[1]), "rgba(169,123,255,.10)")); });
+  svg1.push(gridAndAxis(y1, H1, [0,1,2,3,4], function(v){ return v+"T"; }));
+  svg1.push(eventMarkers());
+  svg1.push('<line x1="'+ML+'" y1="'+y1(0).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y1(0).toFixed(1)+'" stroke="#2a3a4d" stroke-width="1"/>');
+  svg1.push('<path d="'+linePath(L.safe_line, y1)+'" fill="none" stroke="#f0b429" stroke-width="1.6" stroke-dasharray="5 4"/>');
+  svg1.push('<path d="'+linePath(S.reserves, y1)+'" fill="none" stroke="#4c8dff" stroke-width="2.2"/>');
+  svg1.push('<line id="hoverLine" x1="-10" y1="'+MT+'" x2="-10" y2="'+(H1-MB)+'" stroke="#8496a9" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>');
+  svg1.push('</svg>');
+  $("chartReserves").innerHTML = svg1.join("") + '<div class="tooltip" id="tipRes" hidden></div>';
+  $("chartResSub").textContent = "准备金峰值 " + tn(L.hist.reserves_max.value) + "（" + dateMD(L.hist.reserves_max.date) + "）· 2019 钱荒低点 " + tn(L.hist.reserves_min_since_2019.value) + " · 低于安全线 " + belowRuns.length + " 段";
+
+  var wrapRes = $("chartReserves"), svgEl = wrapRes.querySelector("svg"), tipRes = $("tipRes"), hLine = $("hoverLine");
+  function nearestIdx(clientX){
+    var rect = svgEl.getBoundingClientRect();
+    var rel = (clientX - rect.left) / rect.width * W;
+    var t = (rel - ML) / (W - ML - MR);
+    return Math.max(0, Math.min(N - 1, Math.round(t * (N - 1))));
+  }
+  wrapRes.addEventListener("mousemove", function(e){
+    var i = nearestIdx(e.clientX);
+    hLine.setAttribute("x1", x(i)); hLine.setAttribute("x2", x(i)); hLine.setAttribute("opacity", "0.7");
+    tipRes.hidden = false;
+    var gap = (S.reserves[i]!==null && L.safe_line[i]!==null) ? (S.reserves[i]-L.safe_line[i]) : null;
+    tipRes.innerHTML = '<b>' + dateCN(Lb[i]) + '</b>'
+      + '<div class="r"><span>准备金</span><span>' + tn(S.reserves[i]) + '</span></div>'
+      + '<div class="r"><span>安全线</span><span>' + tn(L.safe_line[i]) + '</span></div>'
+      + '<div class="r"><span>差距</span><span class="' + (gap>=0?'up':'down') + '">' + trl(gap) + '</span></div>'
+      + '<div class="r"><span>占 GDP</span><span>' + fmt(L.gdp_pct[i]) + '%</span></div>'
+      + '<div class="r"><span>TGA</span><span>' + tn(S.tga[i]) + '</span></div>'
+      + '<div class="r"><span>ON RRP</span><span>' + tn(S.rrp[i]) + '</span></div>';
+    var r = wrapRes.getBoundingClientRect();
+    var px = (x(i) / W) * r.width;
+    tipRes.style.left = Math.min(r.width - 190, Math.max(8, px + 12)) + 'px';
+    tipRes.style.top = '18px';
+  });
+  wrapRes.addEventListener("mouseleave", function(){ tipRes.hidden = true; hLine.setAttribute("opacity", "0"); });
+
+  // 图 2：占 GDP %
+  var H2 = 260, yMin2 = 0, yMax2 = 20;
+  function y2(v){ return MT + (1 - (v - yMin2) / (yMax2 - yMin2)) * (H2 - MT - MB); }
+  var svg2 = ['<svg viewBox="0 0 '+W+' '+H2+'" preserveAspectRatio="none">'];
+  svg2.push(gridAndAxis(y2, H2, [0,5,10,15,20], function(v){ return v+"%"; }));
+  svg2.push('<line x1="'+ML+'" y1="'+y2(10).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y2(10).toFixed(1)+'" stroke="#f0b429" stroke-width="1.4" stroke-dasharray="5 4"/>');
+  svg2.push('<path d="'+linePath(L.gdp_pct, y2)+'" fill="none" stroke="#4c8dff" stroke-width="2.2"/>');
+  svg2.push('</svg>');
+  $("chartPct").innerHTML = svg2.join("");
+  var peakIdx = idxOf[L.hist.reserves_max.date];
+  var peakPct = (peakIdx!==undefined && L.gdp_pct[peakIdx]!==null) ? L.gdp_pct[peakIdx] : null;
+  $("chartPctSub").textContent = "2002–2008 在 0.4%–1.5% 低位；QE 后 2014 年首次破 10%，2021-12 峰值 " + fmt(peakPct,1) + "%（约 " + tn(L.hist.reserves_max.value) + "）· 当前 " + fmt(lat.pct_gdp) + "%";
+
+  // 图 3：TGA + RRP
+  var H3 = 300, yMax3 = 4.6, yMin3 = 0;
+  function y3(v){ return MT + (1 - (v/1e6 - yMin3) / (yMax3 - yMin3)) * (H3 - MT - MB); }
+  var svg3 = ['<svg viewBox="0 0 '+W+' '+H3+'" preserveAspectRatio="none">'];
+  svg3.push(gridAndAxis(y3, H3, [0,1,2,3,4], function(v){ return v+"T"; }));
+  svg3.push(eventMarkers());
+  svg3.push('<line x1="'+ML+'" y1="'+y3(0).toFixed(1)+'" x2="'+(W-MR)+'" y2="'+y3(0).toFixed(1)+'" stroke="#2a3a4d" stroke-width="1"/>');
+  svg3.push('<path d="'+linePath(S.rrp, y3)+'" fill="none" stroke="#a97bff" stroke-width="1.9"/>');
+  svg3.push('<path d="'+linePath(S.tga, y3)+'" fill="none" stroke="#0ecb81" stroke-width="1.9"/>');
+  svg3.push('</svg>');
+  $("chartTga").innerHTML = svg3.join("");
+  $("chartTgaSub").textContent = "ON RRP 峰值 " + tn(L.hist.rrp_max.value) + "（" + dateMD(L.hist.rrp_max.date) + "）；2019 钱荒前 RRP 近乎归零（银行没钱借出）";
+
+  /* ---------- 怎么读 ---------- */
+  var findings = [
+    "<b>准备金是回购市场的「弹药」</b>：银行在美联储账上的准备金越充裕，越愿意在隔夜回购（Repo）放钱给券商和对冲基金；跌破安全线 → 银行惜贷 → 短期利率飙涨 → 股债金无差别抛售。",
+    "<b>10% 安全线是经验值</b>：华尔街用「准备金 / 名义 GDP ≥ 10%（近年约 3 万亿美元）」判断是否充裕。当前 <b>" + fmt(lat.pct_gdp) + "%</b>" + (low?"，已跌破":"，仍在线上") + "。",
+    "<b>2019-09 是前车之鉴</b>：缩表把准备金压到 " + tn(L.hist.reserves_min_since_2019.value) + "（" + dateMD(L.hist.reserves_min_since_2019.date) + "），回购利率一夜飙到 10%，美联储被迫紧急购债。",
+    "<b>TGA 是「财政部的水龙头」</b>：TGA 上升（发债/税收入账）抽走银行体系流动性；TGA 下降（支出/还债）放回。2026 年 TGA 重建是当前流动性的主要抽水来源。",
+    "<b>ON RRP 是「闲置资金的蓄水池」</b>：资金充裕时货币基金把多余现金存回美联储；ON RRP 从 2023-04 峰值 " + tn(L.hist.rrp_max.value) + " 降到接近 0，说明「多余的钱」已经抽干，缓冲垫见底。",
+    "<b>三件套一起看</b>：准备金（底层弹药）· TGA（财政抽放）· ON RRP（蓄水池）。ON RRP 耗尽后，TGA 重建或缩表会直接抽准备金，安全线就是最后防线。",
+  ];
+  $("findings").innerHTML = findings.map(function(t,i){ return '<li><span class="n">'+String(i+1).padStart(2,"0")+'</span>'+t+'</li>'; }).join("");
+
+  $("currentBox").innerHTML = [
+    '<li><span class="n">准备金</span><b>' + tn(lat.reserves) + '</b>（' + dateCN(lat.date) + '）· 4 周 ' + trl(lat.chg_4w_reserves) + '</li>',
+    '<li><span class="n">占 GDP</span><b>' + fmt(lat.pct_gdp) + '%</b> vs 安全线 ' + L.config.safe_gdp_pct + '%（' + tn(lat.safe_line) + '）· 差距 ' + trl(lat.gap) + '</li>',
+    '<li><span class="n">TGA</span><b>' + tn(lat.tga) + '</b> · 4 周 ' + trl(lat.chg_4w_tga) + '</li>',
+    '<li><span class="n">ON RRP</span><b>' + tn(lat.rrp) + '</b> · 4 周 ' + trl(lat.chg_4w_rrp) + '</li>',
+    '<li><span class="n">峰值</span>准备金 ' + tn(L.hist.reserves_max.value) + '（' + dateMD(L.hist.reserves_max.date) + '）· RRP ' + tn(L.hist.rrp_max.value) + '（' + dateMD(L.hist.rrp_max.date) + '）</li>',
+    '<li><span class="n">前科</span>2019 钱荒低点 ' + tn(L.hist.reserves_min_since_2019.value) + '（' + dateMD(L.hist.reserves_min_since_2019.date) + '）</li>',
+  ].join("");
+  $("curSub").textContent = "截至 " + dateCN(lat.date);
+
+  /* ---------- 表格 ---------- */
+  var rows = [
+    ["准备金历史峰值", dateCN(L.hist.reserves_max.date), tn(L.hist.reserves_max.value), "QE 末（2021-12）"],
+    ["2019 钱荒低点", dateCN(L.hist.reserves_min_since_2019.date), tn(L.hist.reserves_min_since_2019.value), "回购利率飙至 10%，美联储紧急购债"],
+    ["ON RRP 峰值", dateCN(L.hist.rrp_max.date), tn(L.hist.rrp_max.value), "QT 初期资金回流（2023-04）"],
+    ["当前准备金", dateCN(lat.date), tn(lat.reserves), "占 GDP " + fmt(lat.pct_gdp) + "%"],
+    ["当前 TGA", dateCN(lat.date), tn(lat.tga), "财政重建"],
+    ["当前 ON RRP", dateCN(lat.date), tn(lat.rrp), "蓄水池近枯"],
+  ];
+  var html = '<thead><tr><th>节点</th><th>日期</th><th>读数</th><th>说明</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html += '<tr><td class="nm">' + r[0] + '</td><td class="nm">' + r[1] + '</td><td>' + r[2] + '</td><td class="nm">' + r[3] + '</td></tr>';
+  });
+  html += '</tbody>';
+  $("histTable").innerHTML = html;
+})();
+</script>
+</body>
+</html>
