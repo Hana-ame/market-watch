@@ -36,8 +36,10 @@ SESSION.trust_env = False
 
 SERIES = {
     "WRESBAL": "银行准备金（百万美元）",
-    "WDTGAL": "财政部 TGA（百万美元）",
-    "WLRRAL": "隔夜逆回购 ON RRP（百万美元）",
+    "WTREGEN": "财政部 TGA（日，百万美元）",
+    "RRPONTSYD": "隔夜逆回购 ON RRP（日，十亿美元）",
+    "WDTGAL": "财政部 TGA-H.4.1 周三（百万美元，补充）",
+    "WLRRAL": "隔夜逆回购 ON RRP-H.4.1 周三（百万美元，补充）",
     "GDP": "名义 GDP（十亿美元）",
     "IORB": "准备金余额利率（日，%）",
     "IORR": "准备金余额利率-旧口径（日，%，2021-07 前）",
@@ -125,20 +127,28 @@ def main():
             return 0
 
     raw = {sid: parse(fetch_csv(sid)) for sid in SERIES}
-    wres, tga, rrp = raw["WRESBAL"], raw["WDTGAL"], raw["WLRRAL"]
+    wres, tga, rrp = raw["WRESBAL"], raw["WTREGEN"], raw["RRPONTSYD"]
     if not wres:
         raise RuntimeError("WRESBAL empty")
 
-    labels, series = [], {"reserves": [], "tga": [], "rrp": []}
-    tga_map, rrp_map = dict(tga), dict(rrp)
-    last = {"tga": None, "rrp": None}
+    labels, series = [], {"reserves": [], "tga": [], "rrp": [], "rrp_h41": [], "tga_h41": []}
+    tga_map = dict(tga)
+    # RRPONTSYD 单位十亿美元 → 转百万美元（×1000），与准备金同单位便于统一显示
+    rrp_map = {d: v * 1000.0 for d, v in rrp if v is not None}
+    wlrral_map = dict(raw["WLRRAL"])   # H.4.1 周报口径（百万美元）
+    wdtgal_map = dict(raw["WDTGAL"])   # H.4.1 周报口径（百万美元）
+    last = {"tga": None, "rrp": None, "rrp_h41": None, "tga_h41": None}
     for d, v in wres:
         labels.append(d)
         last["tga"] = tga_map.get(d, last["tga"])
         last["rrp"] = rrp_map.get(d, last["rrp"])
+        last["rrp_h41"] = wlrral_map.get(d, last["rrp_h41"])
+        last["tga_h41"] = wdtgal_map.get(d, last["tga_h41"])
         series["reserves"].append(v)
         series["tga"].append(last["tga"])
         series["rrp"].append(last["rrp"])
+        series["rrp_h41"].append(last["rrp_h41"])
+        series["tga_h41"].append(last["tga_h41"])
 
     gdp_daily = dict(quarterly_to_daily(raw["GDP"]))
     gdp_series = [gdp_daily.get(d) for d in labels]
@@ -185,6 +195,8 @@ def main():
         "reserves": series["reserves"][-1] if n else None,
         "tga": series["tga"][-1] if n else None,
         "rrp": series["rrp"][-1] if n else None,
+        "rrp_h41": series["rrp_h41"][-1] if n else None,
+        "tga_h41": series["tga_h41"][-1] if n else None,
         "gdp": last_valid(gdp_series),
         "pct_gdp": last_valid(pct_gdp),
         "safe_line": last_valid(safe_line),
@@ -192,6 +204,7 @@ def main():
         "chg_4w_reserves": week_chg(series["reserves"]),
         "chg_4w_tga": week_chg(series["tga"]),
         "chg_4w_rrp": week_chg(series["rrp"]),
+        "rrp_drained": (last_valid(series["rrp"]) is not None and last_valid(series["rrp"]) < 5e9),
     }
 
     # ---------- 真实无风险收益率（IORB 与目标区间） ----------
@@ -313,6 +326,8 @@ def main():
         "generated_at": dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M"),
         "sources": {
             "WRESBAL": "https://fred.stlouisfed.org/series/WRESBAL",
+            "WTREGEN": "https://fred.stlouisfed.org/series/WTREGEN",
+            "RRPONTSYD": "https://fred.stlouisfed.org/series/RRPONTSYD",
             "WDTGAL": "https://fred.stlouisfed.org/series/WDTGAL",
             "WLRRAL": "https://fred.stlouisfed.org/series/WLRRAL",
             "GDP": "https://fred.stlouisfed.org/series/GDP",

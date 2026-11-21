@@ -178,7 +178,7 @@
       <span class="li"><i style="background:#a97bff"></i>隔夜逆回购 ON RRP 余额</span>
       <span class="li"><i style="background:rgba(140,150,170,.35)"></i>关键事件</span>
     </div>
-    <div class="panel-sub" style="margin-top:8px">TGA 上升 = 财政部回笼资金（收紧）；ON RRP 上升 = 资金回流美联储（收紧），二者下降 = 释放流动性。</div>
+    <div class="panel-sub" style="margin-top:8px">TGA 上升 = 财政部回笼资金（收紧）；ON RRP 上升 = 资金回流美联储（收紧），二者下降 = 释放流动性。ON RRP 用日频 RRPONTSYD（十亿美元，×1000 转百万美元）；当前已见底，注意与 H.4.1 周报存量（WLRRAL）口径不同。</div>
   </section>
 
   <div class="grid-2">
@@ -202,10 +202,12 @@
 
   <div class="foot">
     数据：<a href="https://fred.stlouisfed.org/series/WRESBAL">FRED WRESBAL</a>（银行准备金）、
-    <a href="https://fred.stlouisfed.org/series/WDTGAL">WDTGAL</a>（财政部 TGA）、
-    <a href="https://fred.stlouisfed.org/series/WLRRAL">WLRRAL</a>（隔夜逆回购 ON RRP）、
+    <a href="https://fred.stlouisfed.org/series/WTREGEN">WTREGEN</a>（财政部 TGA，日频）、
+    <a href="https://fred.stlouisfed.org/series/RRPONTSYD">RRPONTSYD</a>（隔夜逆回购 ON RRP，日频，十亿美元）、
+    <a href="https://fred.stlouisfed.org/series/WDTGAL">WDTGAL</a> /
+    <a href="https://fred.stlouisfed.org/series/WLRRAL">WLRRAL</a>（H.4.1 周三口径，对照）、
     <a href="https://fred.stlouisfed.org/series/GDP">GDP</a>（名义，季度）。<br>
-    口径：准备金 / TGA / RRP 取美联储 H.4.1 每周三读数（百万美元）；GDP 季度值线性插值成日度后取年化；安全线 = 年化 GDP × 10%。<br>
+    口径：准备金取 H.4.1 每周三读数（百万美元）；TGA 取 WTREGEN 日频（百万美元）；ON RRP 取 RRPONTSYD 日频（十亿美元，×1000 转百万美元）。H.4.1 周三口径（WDTGAL/WLRRAL）作为对照保留——两者口径不同：日频 RRPONTSYD 是「当天实际在逆回购池的量」（现接近 0），WLRRAL 是「H.4.1 资产负债表的周三存量」。GDP 季度值线性插值成日度后取年化；安全线 = 年化 GDP × 10%。<br>
     准备金 = 商业银行在美联储账上的「活钱」，是回购市场结算的底层；跌破安全线曾于 2019-09 引发钱荒。本页为数据观察，不构成投资建议。数据生成 <span id="genAt">—</span>。
   </div>
 </div>
@@ -236,20 +238,23 @@
   var badge = low ? '<span class="badge warn">低于安全线</span>' : '<span class="badge">高于安全线</span>';
   if(lat.pct_gdp < L.config.safe_gdp_pct - 1.5) badge = '<span class="badge danger">深度警戒</span>';
 
+  var rrpDrained = lat.rrp_drained;
+  var drainedNote = rrpDrained
+    ? "<span class='danger'>ON RRP 已见底（不足 50 亿美元），流动性缓冲垫用光——接下来财政部发债抽水或银行惜贷都会直接冲击准备金。</span>"
+    : "<span class='warn'>ON RRP 仍有缓冲，尚未见底。</span>";
+
   $("summary").innerHTML = "<b>一句话：</b>银行准备金 <b>" + tn(lat.reserves) + "</b>，占年化 GDP <b class='" + cls + "'>" +
     fmt(lat.pct_gdp) + "%</b>" + badge + "（安全线 " + L.config.safe_gdp_pct + "% = " + tn(lat.safe_line) + "，" +
     (lat.gap>=0 ? "高于安全线 " + tn(lat.gap) : "低于安全线 " + tn(-lat.gap)) + "）；" +
     "近 4 周准备金 <b class='" + (lat.chg_4w_reserves>=0?"up":"down") + "'>" + trl(lat.chg_4w_reserves) + "</b>，TGA <b>" +
-    trl(lat.chg_4w_tga) + "</b>，ON RRP <b>" + trl(lat.chg_4w_rrp) + "</b>。" +
-    (low ? "<span class='warn'>准备金已跌破 10% 安全线，若继续下探将压缩银行在回购市场放钱的能力（2019-09 前车之鉴）。</span>" :
-           "<span class='warn'>准备金仍在安全线上方，短期未见流动性枯竭信号。</span>");
+    trl(lat.chg_4w_tga) + "</b>，ON RRP <b>" + tn(lat.rrp) + "</b>。" + drainedNote;
 
   function stat(k, v, s, extraCls){ return '<div class="stat"><div class="k">'+k+'</div><div class="v '+(extraCls||'')+'">'+v+'</div><div class="s">'+s+'</div></div>'; }
   $("stats").innerHTML =
     stat("银行准备金", tn(lat.reserves), "H.4.1 截至 " + dateMD(lat.date), cls) +
     stat("占年化 GDP", fmt(lat.pct_gdp) + "%", "安全线 " + L.config.safe_gdp_pct + "%（" + tn(lat.safe_line) + "）", cls) +
     stat("财政部 TGA", tn(lat.tga), "4 周 " + trl(lat.chg_4w_tga)) +
-    stat("ON RRP", tn(lat.rrp), "4 周 " + trl(lat.chg_4w_rrp));
+    stat("ON RRP", tn(lat.rrp), rrpDrained ? "已见底 · 缓冲垫耗尽" : "4 周 " + trl(lat.chg_4w_rrp), rrpDrained ? "danger" : "");
 
   /* ---------- 真实无风险收益率（IORB）：渲染移到图表常量之后 ---------- */
 
@@ -431,8 +436,8 @@
     "<b>准备金是回购市场的「弹药」</b>：银行在美联储账上的准备金越充裕，越愿意在隔夜回购（Repo）放钱给券商和对冲基金；跌破安全线 → 银行惜贷 → 短期利率飙涨 → 股债金无差别抛售。",
     "<b>10% 安全线是经验值</b>：华尔街用「准备金 / 名义 GDP ≥ 10%（近年约 3 万亿美元）」判断是否充裕。当前 <b>" + fmt(lat.pct_gdp) + "%</b>" + (low?"，已跌破":"，仍在线上") + "。",
     "<b>2019-09 是前车之鉴</b>：缩表把准备金压到 " + tn(L.hist.reserves_min_since_2019.value) + "（" + dateMD(L.hist.reserves_min_since_2019.date) + "），回购利率一夜飙到 10%，美联储被迫紧急购债。",
-    "<b>TGA 是「财政部的水龙头」</b>：TGA 上升（发债/税收入账）抽走银行体系流动性；TGA 下降（支出/还债）放回。2026 年 TGA 重建是当前流动性的主要抽水来源。",
-    "<b>ON RRP 是「闲置资金的蓄水池」</b>：资金充裕时货币基金把多余现金存回美联储；ON RRP 从 2023-04 峰值 " + tn(L.hist.rrp_max.value) + " 降到接近 0，说明「多余的钱」已经抽干，缓冲垫见底。",
+    "<b>TGA 是「财政部的水龙头」</b>：TGA 上升（发债/税收入账）抽走银行体系流动性；TGA 下降（支出/还债）放回。当前 TGA " + tn(lat.tga) + "，2026 年 TGA 重建是当前流动性的主要抽水来源。",
+    "<b>ON RRP 是「闲置资金的蓄水池」</b>：资金充裕时货币基金把多余现金存回美联储；ON RRP 从日频峰值 " + tn(L.hist.rrp_max.value) + "（" + dateMD(L.hist.rrp_max.date) + "）降到当前 " + tn(lat.rrp) + "，" + (rrpDrained ? "已见底，缓冲垫用光——财政部发债或银行惜贷将直接冲击准备金。" : "仍有余量。"),
     "<b>三件套一起看</b>：准备金（底层弹药）· TGA（财政抽放）· ON RRP（蓄水池）。ON RRP 耗尽后，TGA 重建或缩表会直接抽准备金，安全线就是最后防线。",
   ];
   $("findings").innerHTML = findings.map(function(t,i){ return '<li><span class="n">'+String(i+1).padStart(2,"0")+'</span>'+t+'</li>'; }).join("");
@@ -441,8 +446,8 @@
     '<li><span class="n">准备金</span><b>' + tn(lat.reserves) + '</b>（' + dateCN(lat.date) + '）· 4 周 ' + trl(lat.chg_4w_reserves) + '</li>',
     '<li><span class="n">占 GDP</span><b>' + fmt(lat.pct_gdp) + '%</b> vs 安全线 ' + L.config.safe_gdp_pct + '%（' + tn(lat.safe_line) + '）· 差距 ' + trl(lat.gap) + '</li>',
     '<li><span class="n">TGA</span><b>' + tn(lat.tga) + '</b> · 4 周 ' + trl(lat.chg_4w_tga) + '</li>',
-    '<li><span class="n">ON RRP</span><b>' + tn(lat.rrp) + '</b> · 4 周 ' + trl(lat.chg_4w_rrp) + '</li>',
-    '<li><span class="n">峰值</span>准备金 ' + tn(L.hist.reserves_max.value) + '（' + dateMD(L.hist.reserves_max.date) + '）· RRP ' + tn(L.hist.rrp_max.value) + '（' + dateMD(L.hist.rrp_max.date) + '）</li>',
+    '<li><span class="n">ON RRP</span><b>' + tn(lat.rrp) + '</b> · ' + (rrpDrained ? "已见底（缓冲垫耗尽）" : "4 周 " + trl(lat.chg_4w_rrp)) + '</li>',
+    '<li><span class="n">峰值</span>准备金 ' + tn(L.hist.reserves_max.value) + '（' + dateMD(L.hist.reserves_max.date) + '）· ON RRP 日频 ' + tn(L.hist.rrp_max.value) + '（' + dateMD(L.hist.rrp_max.date) + '）</li>',
     '<li><span class="n">前科</span>2019 钱荒低点 ' + tn(L.hist.reserves_min_since_2019.value) + '（' + dateMD(L.hist.reserves_min_since_2019.date) + '）</li>',
   ].join("");
   $("curSub").textContent = "截至 " + dateCN(lat.date);
@@ -451,10 +456,10 @@
   var rows = [
     ["准备金历史峰值", dateCN(L.hist.reserves_max.date), tn(L.hist.reserves_max.value), "QE 末（2021-12）"],
     ["2019 钱荒低点", dateCN(L.hist.reserves_min_since_2019.date), tn(L.hist.reserves_min_since_2019.value), "回购利率飙至 10%，美联储紧急购债"],
-    ["ON RRP 峰值", dateCN(L.hist.rrp_max.date), tn(L.hist.rrp_max.value), "QT 初期资金回流（2023-04）"],
+    ["ON RRP 峰值（日频）", dateCN(L.hist.rrp_max.date), tn(L.hist.rrp_max.value), "QT 初期资金回流（" + dateMD(L.hist.rrp_max.date) + "）"],
     ["当前准备金", dateCN(lat.date), tn(lat.reserves), "占 GDP " + fmt(lat.pct_gdp) + "%"],
     ["当前 TGA", dateCN(lat.date), tn(lat.tga), "财政重建"],
-    ["当前 ON RRP", dateCN(lat.date), tn(lat.rrp), "蓄水池近枯"],
+    ["当前 ON RRP", dateCN(lat.date), tn(lat.rrp), rrpDrained ? "已见底 · 缓冲垫耗尽" : "蓄水池"],
   ];
   var html = '<thead><tr><th>节点</th><th>日期</th><th>读数</th><th>说明</th></tr></thead><tbody>';
   rows.forEach(function(r){

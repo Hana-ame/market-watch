@@ -85,12 +85,12 @@ E:\market-watch\index.html
 
 - **准备金 vs 安全线主图**：`WRESBAL`（美联储 H.4.1 每周三读数）叠加「安全线 = 年化名义 GDP × 10%」，低于安全线的区间用紫色带标出。华尔街经验口径：准备金 ≥ GDP 的 10%（近年约 3 万亿美元）才算充裕。
 - **占年化 GDP（%）**：准备金 / 年化 GDP 的百分位曲线，10% 安全线为虚线。
-- **TGA + ON RRP**：财政部一般账户 `WDTGAL` 与隔夜逆回购 `WLRRAL` 走势——TGA 上升抽水、下降放水；ON RRP 是货币基金停泊的闲钱，接近零意味着「蓄水池见底」。
+- **TGA + ON RRP**：财政部一般账户 `WTREGEN`（日频，百万美元）与隔夜逆回购 `RRPONTSYD`（日频，十亿美元 → ×1000 转百万美元）走势——TGA 上升抽水、下降放水；ON RRP 是货币基金停泊的闲钱，接近零意味着「蓄水池见底」。H.4.1 周三口径（`WDTGAL` / `WLRRAL`）作对照保留。
 - **关键事件标记**：2019-09 钱荒（准备金低点）、2020-03 疫情 QE、2021-12 Taper、2022-06 QT 缩表、2025-10 TGA 重建。
 - **怎么读 / 当前读数 / 关键历史节点**：准备金是回购市场的弹药，跌破安全线 → 银行惜贷 → 短期利率飙涨 → 股债金无差别抛售（2019-09 前车之鉴）。
 - **银行存放美联储的真实无风险收益率（IORB）**：`IORB`（准备金余额利率）即银行把准备金存在美联储账上赚到的利息；自 2021-07 起精确等于「联邦基金目标区间上限 − 10bp」（`DFEDTARU − 0.10`），此前 2008-10 至 2021-07 由旧口径 `IORR` 衔接。卡片给出 IORB、目标区间上限 − 0.10%（对照验证）、SOFR − IORB 利差（回购融资相对准备金的溢价）、目标区间；下方是 IORB / 上限−0.10 / SOFR 的 2008 年至今曲线。
 
-数据来自 FRED 公开 CSV（`fredgraph.csv`，无需 API key）：`WRESBAL` / `WDTGAL` / `WLRRAL`（均为百万美元，周频）+ `GDP`（季度，插值成日度后取年化）+ `IORB` / `IORR` / `DFEDTARU` / `DFEDTARL` / `SOFR`（利率，日频）。安全线 = 年化 GDP × 10%。
+数据来自 FRED 公开 CSV（`fredgraph.csv`，无需 API key）：`WRESBAL`（百万美元，周频）+ `WTREGEN` / `RRPONTSYD`（日频，TGA 百万美元 / RRP 十亿美元）+ `WDTGAL` / `WLRRAL`（H.4.1 周三对照）+ `GDP`（季度，插值成日度后取年化）+ `IORB` / `IORR` / `DFEDTARU` / `DFEDTARL` / `SOFR`（利率，日频）。安全线 = 年化 GDP × 10%。
 
 更新方式：`python3 fetch_reserves.py [--if-stale 20]`，产物 `reserves.js`（`window.RESERVES`）不入库，由 CI 生成后随 Pages 一并部署。
 
@@ -101,7 +101,7 @@ E:\market-watch\index.html
 - **矿业期货**：国内 19 个品种用新浪 `nf_CU0`/`nf_RB0`/`nf_LC0`… 报价 + 东财主连日线；国际用新浪 `hf_CAD`（伦铜）/`hf_AHD`（伦铝）/`hf_ZSD`（伦锌）/`hf_HG`（COMEX 铜，美分/磅）。
 - 刷新节奏（已装）：WSL cron 工作日日盘 `09:00–14:55` 每 5 分钟、`15:00/15:05` 收盘；**夜间 `16:00–23:50` 与 `00:00–02:50`（周二至周六）每 10 分钟**覆盖国内夜盘与 LME/COMEX；Windows 计划任务 `MarketWatch-Refresh` 工作日 `09:20 / 15:10` 兜底。全量刷新约 2–4 秒（脚本显式绕过本机 HTTP 代理直连；走代理约 10 秒/请求）。
 - **FRED + CFTC（流动性页）**：`fredgraph.csv?id=...` 取 WALCL / WTREGEN / RRPONTSYD / SOFR / IORB / BAMLH0A0HYM2 / STLFSI4 / DFII10 / DTWEXBGS / M2SL / SP500 / DGS10；CFTC `publicreporting.cftc.gov` Socrata 取黄金管理基金持仓（合约 088691）。日内不刷新，随每日 CI 一次。
-- **FRED（准备金页）**：`fredgraph.csv?id=...` 取 WRESBAL / WDTGAL / WLRRAL / GDP / IORB / IORR / DFEDTARU / DFEDTARL / SOFR；周频，随 update.sh 每轮跑（`--if-stale 20`，即最多每 20 天强制刷新一次）。
+- **FRED（准备金页）**：`fredgraph.csv?id=...` 取 WRESBAL / WTREGEN / RRPONTSYD / WDTGAL / WLRRAL / GDP / IORB / IORR / DFEDTARU / DFEDTARL / SOFR；周频，随 update.sh 每轮跑（`--if-stale 20`，即最多每 20 天强制刷新一次）。
 - 手动刷新：双击 `update.bat`，或 `bash /mnt/e/market-watch/update.sh`。
 
 ## 折算公式
@@ -125,7 +125,7 @@ E:\market-watch\index.html
 | `fetch_liquidity.py` | 取 FRED + CFTC，生成 `liquidity.js` |
 | `reserves.html` | 银行准备金页：准备金 vs 安全线 / 占 GDP / TGA + ON RRP / 关键事件 |
 | `reserves.js` | 脚本生成的准备金快照（`window.RESERVES`），CI 生成不入库 |
-| `fetch_reserves.py` | 取 FRED WRESBAL / WDTGAL / WLRRAL + GDP，生成 `reserves.js` |
+| `fetch_reserves.py` | 取 FRED WRESBAL / WTREGEN / RRPONTSYD / WDTGAL / WLRRAL + GDP + IORB/IORR/DFEDTARU/DFEDTARL/SOFR，生成 `reserves.js` |
 | `fetch_market.py` | 取数 + 统计 + 生成 `data.js` / `data/latest.json` / 历史 |
 | `update.sh` | 带文件锁的单次刷新入口（cron、计划任务、手动共用） |
 | `update.bat` | Windows 双击刷新（转调 WSL 的 update.sh） |
