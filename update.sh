@@ -22,6 +22,26 @@ python3 "$DIR/fetch_market.py" >>"$LOG" 2>&1
 python3 "$DIR/fetch_history.py" --if-stale 1 >>"$LOG" 2>&1 || echo "[warn] fetch_history 失败（沿用旧 rates.js）" >>"$LOG"
 python3 "$DIR/fetch_liquidity.py" --if-stale 1 >>"$LOG" 2>&1 || echo "[warn] fetch_liquidity 失败（沿用旧 liquidity.js）" >>"$LOG"
 python3 "$DIR/fetch_reserves.py" --if-stale 1 >>"$LOG" 2>&1 || echo "[warn] fetch_reserves 失败（沿用旧 reserves.js）" >>"$LOG"
+
+# ---------- 财报分析（Pi Agent，CI 里跑；本地/服务器尽力而为） ----------
+# 有 GEMINI_API_KEY + node/pi：本地跑 fetch_earnings + pi 生成 dist/earnings/index.html
+# 无 key（如自托管服务器）：从 GitHub Pages 镜像最新财报页，保证 /earnings/ 不 404
+python3 "$DIR/fetch_earnings.py" >>"$LOG" 2>&1 || echo "[warn] fetch_earnings 失败（沿用旧 earnings_raw.json）" >>"$LOG"
+if [ -n "${GEMINI_API_KEY:-}" ] && command -v pi >/dev/null 2>&1; then
+  mkdir -p "$DIR/dist/earnings"
+  ( cd "$DIR" && pi --provider google --model "gemini-3-flash-preview" -p "$(cat prompt.md)" ) >>"$LOG" 2>&1 \
+    && echo "[ok] earnings 分析完成（dist/earnings/index.html）" >>"$LOG" \
+    || echo "[warn] pi 分析失败（沿用旧 dist/earnings/index.html）" >>"$LOG"
+else
+  # 镜像 Pages 产物（服务器无 key 时）
+  mkdir -p "$DIR/dist/earnings"
+  curl -s --max-time 30 -o "$DIR/dist/earnings/index.html" \
+    "https://hana-ame.github.io/market-watch/earnings/index.html" >>"$LOG" 2>&1 \
+    && [ -s "$DIR/dist/earnings/index.html" ] \
+    && echo "[ok] earnings 从 GitHub Pages 镜像" >>"$LOG" \
+    || echo "[warn] earnings 镜像失败（/earnings/ 可能 404）" >>"$LOG"
+fi
+
 rc=$?
 printf '[done] rc=%s %ss\n' "$rc" "$(( $(date +%s) - start ))" >>"$LOG"
 

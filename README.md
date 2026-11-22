@@ -99,6 +99,15 @@ E:\market-watch\index.html
 
 更新方式：`python3 fetch_reserves.py [--if-stale 20]`，产物 `reserves.js`（`window.RESERVES`）不入库，由 CI 生成后随 Pages 一并部署。
 
+## AI 财报分析页（`earnings/`）
+
+- **入口**：主站导航「AI 财报」→ `earnings/index.html`（GitHub Pages 部署到 `/market-watch/earnings/`）。
+- **数据**：`fetch_earnings.py` 确定性抓取三市场——美股 SEC EDGAR XBRL `companyfacts`（AAPL/MSFT/NVDA 等）、A股东方财富 `RPT_LICO_FN_CPD` 业绩报表、港股东方财富 `RPT_HKF10_FN_MAININDICATOR`（腾讯/阿里/美团），输出 `data/earnings_raw.json`。
+- **分析**：CI 里用 Pi Coding Agent（`pi --provider google --model gemini-3-flash-preview -p "$(cat prompt.md)"`）读 raw 数据、生成含市场总览/三市场卡片/风险提示的 `dist/earnings/index.html`；LLM 密钥走 GitHub Secret `GEMINI_API_KEY`。
+- **调度**：`.github/workflows/update.yml` 每天**早/中/晚**三次（北京 08:17 / 12:17 / 20:17）跑完整站点 + 财报分析并部署 Pages。
+- **免责声明**：页面底部固定「数据来自公开渠道（SEC EDGAR / 东方财富），分析由 AI 自动生成，仅供参考，不构成投资建议」。
+- **自托管**：服务器 `update.sh` 无 GEMINI key 时自动从 GitHub Pages 镜像 `/earnings/index.html`，保证 `watch.moonchan.xyz/earnings/` 不 404。
+
 ## 数据与刷新
 
 - **新浪财经**：`hq.sinajs.cn`（伦敦金 XAU、伦敦银 XAG、WTI、布伦特、沪金主连 AU0、上海原油 SC0、黄金 T+D、在岸 USD/CNY、USD/JPY、JPY/CNY）；`stock2.finance.sina.com.cn`（外盘与国内期货日线）。该接口必须带 `Referer: https://finance.sina.com.cn`，否则返回空。
@@ -131,13 +140,16 @@ E:\market-watch\index.html
 | `reserves.html` | 银行准备金页：准备金 vs 安全线 / 占 GDP / TGA + ON RRP / 关键事件 |
 | `reserves.js` | 脚本生成的准备金快照（`window.RESERVES`），CI 生成不入库 |
 | `fetch_reserves.py` | 取 FRED WRESBAL / WTREGEN / RRPONTSYD / WDTGAL / WLRRAL + GDP + IORB/IORR/DFEDTARU/DFEDTARL/SOFR，生成 `reserves.js` |
+| `earnings/` | AI 财报分析页（Pi Agent 生成，含免责声明），部署到 `site/earnings/index.html` |
+| `fetch_earnings.py` | 取 SEC EDGAR（美股）+ 东方财富（A股/港股）财报，生成 `data/earnings_raw.json` |
+| `prompt.md` | 给 Pi Agent 的财报分析指令（读 raw → 分析 → 写 `dist/earnings/index.html`） |
 | `fetch_market.py` | 取数 + 统计 + 生成 `data.js` / `data/latest.json` / 历史 |
 | `update.sh` | 带文件锁的单次刷新入口（cron、计划任务、手动共用） |
 | `update.bat` | Windows 双击刷新（转调 WSL 的 update.sh） |
 | `install_schedule.ps1` / `uninstall_schedule.ps1` | 注册/卸载 Windows 计划任务 |
 | `data/update.log` | 最近 600 行运行日志 |
 | `data/history.json` | 线上用的按交易日累积历史（CI 每日回写）；本地运行写同目录 `history.local.json` |
-| `.github/workflows/update.yml` | GitHub Actions：每 15 分钟取数并部署 Pages |
+| `.github/workflows/update.yml` | GitHub Actions：每天早/中/晚三次取数 + Pi 财报分析并部署 Pages |
 | `requirements.txt` | CI 依赖（requests） |
 | `data/snapshots/YYYY-MM-DD.json` | 当日完整快照，保留 90 天 |
 

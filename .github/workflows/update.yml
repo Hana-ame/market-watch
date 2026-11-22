@@ -2,9 +2,13 @@ name: Refresh & deploy market-watch
 
 on:
   schedule:
-    # UTC 15:10 = 北京时间 23:10；每天一次，取「A股收盘 + 国内夜盘 + 美盘早段」的当日快照
-    # GitHub schedule 为 best-effort，漏跑时由本机看门狗/Windows 任务 dispatch 兜底
-    - cron: "10 15 * * *"
+    # 每天早 / 中 / 晚各跑一次（用户口径），错开整点避免队列拥堵：
+    #  - 08:17 北京 = 00:17 UTC  早盘前 / 隔夜美股财报
+    #  - 12:17 北京 = 04:17 UTC  A股午间休市 / 早间快讯
+    #  - 20:17 北京 = 12:17 UTC  美股盘前 / 港股收盘后 / 晚间复盘
+    - cron: "17 0 * * *"
+    - cron: "17 4 * * *"
+    - cron: "17 12 * * *"
   workflow_dispatch:
   push:
     branches: [main]
@@ -48,6 +52,32 @@ jobs:
 
       - name: Fetch reserves (reserves.js, weekly)
         run: python fetch_reserves.py --if-stale 1 || echo "[warn] fetch_reserves 失败，沿用旧 reserves.js"
+
+      # ---------- 财报分析（Pi Agent + Gemini） ----------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Pi Agent
+        run: npm install -g @mariozechner/pi-coding-agent
+
+      - name: Fetch earnings data (SEC EDGAR + 东方财富 A股/港股)
+        run: python fetch_earnings.py || echo "[warn] fetch_earnings 失败，沿用旧 earnings_raw.json"
+
+      - name: Run Pi Agent earnings analysis
+        timeout-minutes: 12
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          mkdir -p dist/earnings
+          # 注入 GEMINI key；若 Secrets 未配置则跳过（不阻断整站发布）
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "[warn] GEMINI_API_KEY 未配置，跳过财报分析（Secrets 需设置）"
+            exit 0
+          fi
+          pi --provider google --model "gemini-3-flash-preview" -p "$(cat prompt.md)" \
+            || echo "[warn] pi 分析失败，沿用旧 dist/earnings/index.html"
 
       - name: Fetch market data
         run: |
@@ -103,6 +133,10 @@ jobs:
           cp index.html cycle.html liquidity.html reserves.html README.md data.js rates.js site/
           cp liquidity.js site/ 2>/dev/null || echo "[warn] liquidity.js 缺失，liquidity.html 将提示数据未加载"
           cp reserves.js site/ 2>/dev/null || echo "[warn] reserves.js 缺失，reserves.html 将提示数据未加载"
+          # 财报分析页（Pi Agent 生成，含免责声明）
+          mkdir -p site/earnings
+          cp dist/earnings/index.html site/earnings/index.html 2>/dev/null \
+            || echo "[warn] dist/earnings/index.html 缺失，/earnings/ 将 404"
           ls -la site
 
       - name: Configure Pages

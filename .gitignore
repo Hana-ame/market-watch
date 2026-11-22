@@ -4,6 +4,7 @@ rates.js
 liquidity.js
 reserves.js
 data/cot_gold.json
+data/earnings_raw.json
 data/latest.json
 data/history.local.json
 data/fallback.local.json
@@ -12,6 +13,7 @@ data/update.log
 update.log
 .update.lock
 site/
+dist/
 __pycache__/
 *.pyc
 *.tmp
