@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 财报自动分析 · market-watch</title>
+    <style>
+        body { background-color: #0b1220; color: #d7e0ea; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1, h2 { color: #c9a227; }
+        .meta-bar { background: #121a2b; padding: 10px; border-left: 4px solid #c9a227; margin-bottom: 20px; font-size: 0.9em; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: #121a2b; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h3 { margin-top: 0; color: #c9a227; }
+        .metrics-table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.9em; }
+        .metrics-table td { padding: 4px; border-bottom: 1px solid #1f2a40; }
+        .footer { margin-top: 40px; border-top: 1px solid #1f2a40; padding-top: 20px; font-size: 0.85em; text-align: center; color: #8899aa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI 财报自动分析 · market-watch</h1>
+        <div class="meta-bar">数据截至 2026-11-23 07:04 UTC+08:00 · 由 AI 自动生成</div>
+
+        <section>
+            <h2>市场总览</h2>
+            <p>美股科技巨头整体表现强劲，盈利能力稳健；港股互联网公司在增长与盈利间取得平衡，整体景气度回升。相比之下，A股样本公司受行业周期影响，部分正处于调整阵痛期，景气分化较为明显。</p>
+        </section>
+
+        <section>
+            <h2>美股 (US)</h2>
+            <div class="grid">
+                <!-- AAPL -->
+                <div class="card">
+                    <h3>Apple Inc. (AAPL)</h3>
+                    <p>财报期：2026-09-26</p>
+                    <table class="metrics-table">
+                        <tr><td>营收</td><td>4,788.3 亿 USD</td></tr>
+                        <tr><td>净利润</td><td>1,321.8 亿 USD</td></tr>
+                        <tr><td>EPS</td><td>9.01 USD</td></tr>
+                    </table>
+                    <p>点评：硬件生态壁垒稳固，净利润率极高，现金流极其充裕。仍需关注创新瓶颈带来的增长压力。</p>
+                </div>
+                <!-- MSFT -->
+                <div class="card">
+                    <h3>MICROSOFT CORP (MSFT)</h3>
+                    <p>财报期：2026-09-30</p>
+                    <table class="metrics-table">
+                        <tr><td>营收</td><td>922.8 亿 USD</td></tr>
+                        <tr><td>净利润</td><td>366.3 亿 USD</td></tr>
+                        <tr><td>EPS</td><td>4.93 USD</td></tr>
+                    </table>
+                    <p>点评：云业务支撑核心增长，盈利模式多元且稳健。AI 技术融合深度依然是未来核心看点。</p>
+                </div>
+                <!-- NVDA -->
+                <div class="card">
+                    <h3>NVIDIA CORP (NVDA)</h3>
+                    <p>财报期：2026-07-26</p>
+                    <table class="metrics-table">
+                        <tr><td>营收</td><td>269.1 亿 USD</td></tr>
+                        <tr><td>净利润</td><td>596.9 亿 USD</td></tr>
+                        <tr><td>EPS</td><td>2.47 USD</td></tr>
+                    </table>
+                    <p>点评：算力需求持续爆发，盈利水平惊人。尽管面临高估值争议，但行业龙头地位难以撼动。</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>A股 (CN)</h2>
+            <div class="grid">
+                <!-- 凤凰航运 -->
+                <div class="card">
+                    <h3>凤凰航运 (000520)</h3>
+                    <p>财报期：2025-12-31</p>
+                    <table class="metrics-table">
+                        <tr><td>营收</td><td>7.49 亿 CNY</td></tr>
+                        <tr><td>净利润</td><td>-0.43 亿 CNY</td></tr>
+                        <tr><td>ROE</td><td>-10.03 %</td></tr>
+                        <tr><td>营收YoY</td><td>-15.06 %</td></tr>
+                    </table>
+                    <p>点评：深陷亏损泥潭，营收连续萎缩，航运业务周期性低迷影响明显。经营改善仍需时日。</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>港股 (HK)</h2>
+            <div class="grid">
+                <!-- 腾讯 -->
+                <div class="card">
+                    <h3>腾讯控股 (00700.HK)</h3>
+                    <p>财报期：2026-09-30</p>
+                    <table class="metrics-table">
+                        <tr><td>营收</td><td>6,085.8 亿 HKD</td></tr>
+                        <tr><td>净利润</td><td>1,777.3 亿 HKD</td></tr>
+                        <tr><td>毛利率</td><td>56.79 %</td></tr>
+                        <tr><td>营收YoY</td><td>9.18 %</td></tr>
+                    </table>
+                    <p>点评：生态根基扎实，游戏与社交业务贡献稳定增长，毛利率保持高位，展现极强盈利韧性。</p>
+                </div>
+                <!-- 阿里 -->
+                <div class="card">
+                    <h3>阿里巴巴-W (09988.HK)</h3>
+                    <p>财报期：2026-09-30</p>
+                    <table class="metrics-table">
+                        <tr><td>营收</td><td>5,404.7 亿 HKD</td></tr>
+                        <tr><td>净利润</td><td>751.9 亿 HKD</td></tr>
+                        <tr><td>营收YoY</td><td>9.09 %</td></tr>
+                        <tr><td>净利YoY</td><td>21.93 %</td></tr>
+                    </table>
+                    <p>点评：电商主业积极转型，盈利增速亮眼。需持续关注竞争加剧对毛利率的长期挤压。</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>风险提示</h2>
+            <p>本页数据存在时滞，且各市场统计口径（美股TTM vs A股单季 vs 港股累计）存在差异，可能导致直接对比偏差。分析完全依赖单一数据源，仅供参考与学习交流，不构成任何投资建议。</p>
+        </section>
+
+        <div class="footer">
+            本页数据来自公开渠道（SEC EDGAR / 东方财富），分析内容由 AI 自动生成，仅供参考与学习交流，不构成任何投资建议或买卖依据。
+        </div>
+    </div>
+</body>
+</html>

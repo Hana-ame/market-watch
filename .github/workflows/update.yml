@@ -76,8 +76,18 @@ jobs:
             echo "[warn] GEMINI_API_KEY 未配置，跳过财报分析（Secrets 需设置）"
             exit 0
           fi
-          pi --provider google --model "gemini-3-flash-preview" -p "$(cat prompt.md)" \
-            || echo "[warn] pi 分析失败，沿用旧 dist/earnings/index.html"
+          # gemini-3.1-flash-lite：Free Tier 独立配额桶（gemini-3-flash 20 次/天易撞 429，-preview 会被归一化）
+          # 重试 2 次；全失败则沿用旧产物（dist/ 在 gitignore 中，首次部署需成功一次）
+          for i in 1 2 3; do
+            echo "=== pi attempt $i ==="
+            if pi --provider google --model "gemini-3.1-flash-lite" -p "$(cat prompt.md)"; then
+              echo "[ok] pi 分析成功：dist/earnings/index.html"
+              break
+            fi
+            echo "[warn] pi 第 $i 次失败（可能 429 限流），重试..."
+            sleep 15
+          done
+          [ -f dist/earnings/index.html ] || echo "[warn] dist/earnings/index.html 缺失，/earnings/ 将 404"
 
       - name: Fetch market data
         run: |
@@ -133,10 +143,17 @@ jobs:
           cp index.html cycle.html liquidity.html reserves.html README.md data.js rates.js site/
           cp liquidity.js site/ 2>/dev/null || echo "[warn] liquidity.js 缺失，liquidity.html 将提示数据未加载"
           cp reserves.js site/ 2>/dev/null || echo "[warn] reserves.js 缺失，reserves.html 将提示数据未加载"
-          # 财报分析页（Pi Agent 生成，含免责声明）
+          # 财报分析页：优先用 Pi Agent 新产物，缺失则用仓库兜底页（保证 /earnings/ 始终可访问）
           mkdir -p site/earnings
-          cp dist/earnings/index.html site/earnings/index.html 2>/dev/null \
-            || echo "[warn] dist/earnings/index.html 缺失，/earnings/ 将 404"
+          if [ -f dist/earnings/index.html ]; then
+            cp dist/earnings/index.html site/earnings/index.html
+            echo "[ok] 部署 Pi Agent 新生成的 earnings 页"
+          elif [ -f earnings/index.html ]; then
+            cp earnings/index.html site/earnings/index.html
+            echo "[warn] pi 无新产物，部署仓库兜底 earnings 页"
+          else
+            echo "[warn] earnings 页缺失（dist/ 与 earnings/ 均无），/earnings/ 将 404"
+          fi
           ls -la site
 
       - name: Configure Pages
