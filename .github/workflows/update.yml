@@ -27,7 +27,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,7 +66,8 @@ jobs:
         run: python fetch_earnings.py || echo "[warn] fetch_earnings 失败，沿用旧 earnings_raw.json"
 
       - name: Run Pi Agent earnings analysis
-        timeout-minutes: 12
+        # 6 分钟：pi 正常 15s 完成；若 CI 启动网络卡死，快速失败走兜底页，不拖垮整个 build
+        timeout-minutes: 6
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -77,15 +78,17 @@ jobs:
             exit 0
           fi
           # gemini-3.1-flash-lite：Free Tier 独立配额桶（gemini-3-flash 20 次/天易撞 429，-preview 会被归一化）
+          # --offline：禁用启动网络检查（CI 里 pi 会卡在模型目录/更新检查而挂起，本地 15s 完成）
+          # --no-session：不存会话，规避 CI 无 TTY 的交互挂起
           # 重试 2 次；全失败则沿用旧产物（dist/ 在 gitignore 中，首次部署需成功一次）
           for i in 1 2 3; do
             echo "=== pi attempt $i ==="
-            if pi --provider google --model "gemini-3.1-flash-lite" -p "$(cat prompt.md)"; then
+            if pi --provider google --model "gemini-3.1-flash-lite" --offline --no-session -p "$(cat prompt.md)"; then
               echo "[ok] pi 分析成功：dist/earnings/index.html"
               break
             fi
-            echo "[warn] pi 第 $i 次失败（可能 429 限流），重试..."
-            sleep 15
+            echo "[warn] pi 第 $i 次失败（可能 429 限流/启动挂起），重试..."
+            sleep 10
           done
           [ -f dist/earnings/index.html ] || echo "[warn] dist/earnings/index.html 缺失，/earnings/ 将 404"
 
