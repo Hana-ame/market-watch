@@ -87,7 +87,7 @@ E:\market-watch\index.html
 
 - **入口**：主站导航「AI 财报」→ `earnings/index.html`（GitHub Pages 部署到 `/market-watch/earnings/`）。
 - **数据**：`fetch_earnings.py` 确定性抓取三市场——美股 SEC EDGAR XBRL `companyfacts`（AAPL/MSFT/NVDA 等）、A股东方财富 `RPT_LICO_FN_CPD` 业绩报表、港股东方财富 `RPT_HKF10_FN_MAININDICATOR`（腾讯/阿里/美团），输出 `data/earnings_raw.json`。
-- **分析**：CI 里用 Pi Coding Agent（`pi --provider google --model gemini-3.1-flash-lite -p "$(cat prompt.md)"`）读 raw 数据、生成含市场总览/三市场卡片/风险提示的 `dist/earnings/index.html`；LLM 密钥走 GitHub Secret `GEMINI_API_KEY`。模型选 **gemini-3.1-flash-lite**（Free Tier 独立配额桶；`gemini-3-flash` 仅 20 次/天且 `-preview` 会被归一化，易撞 429）。pi 三次重试全失败时，部署仓库兜底页 `earnings/index.html`，保证 `/earnings/` 始终可访问。
+- **分析**：CI 里用 Pi Coding Agent（`pi --provider google --model gemini-3.1-flash-lite --offline --no-session -p "$(cat prompt.md)"`）读 raw 数据、生成含市场总览/三市场卡片/风险提示的 `dist/earnings/index.html`；LLM 密钥走 GitHub Secret `GEMINI_API_KEY`。模型选 **gemini-3.1-flash-lite**（Free Tier 独立配额桶；`gemini-3-flash` 仅 20 次/天且 `-preview` 会被归一化，易撞 429）。`--offline --no-session` 禁用启动网络检查/会话持久化，规避 CI 无 TTY 下 pi 卡死（实测 CI 里 10s 完成）。pi 三次重试全失败时，部署仓库兜底页 `earnings/index.html`，保证 `/earnings/` 始终可访问。
 - **调度**：`.github/workflows/update.yml` 每天**早/中/晚**三次（北京 08:17 / 12:17 / 20:17）跑完整站点 + 财报分析并部署 Pages。
 - **免责声明**：页面底部固定「数据来自公开渠道（SEC EDGAR / 东方财富），分析由 AI 自动生成，仅供参考，不构成投资建议」。
 - **部署**：仅 GitHub Pages（`/market-watch/earnings/`），由 CI 生成并发布；不依赖自托管。
