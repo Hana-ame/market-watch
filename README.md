@@ -1,45 +1,29 @@
 # 每日看盘 · market-watch
 
-本地运行的每日盯盘面板，**主看 XAUUSD 黄金、WTI/布伦特原油、USD/JPY 日元，并把三者折成人民币价**（元/克、元/桶、元/百日元）；另有「矿业期货」页签（有色 / 黑色 / 铁合金 / 新能源金属 / LME·COMEX 内外盘）和「A股盘面」页签（指数 / 涨跌宽度 / 板块 / 涨停梯队 / 自选股）。
+本地运行的每日盯盘面板，**主看 XAUUSD 黄金、WTI/布伦特原油、USD/JPY 日元，并把三者折成人民币价**（元/克、元/桶、元/百日元）；另有「矿业期货」页签（有色 / 黑色 / 铁合金 / 新能源金属 / LME·COMEX 内外盘）、「A股盘面」页签（指数 / 涨跌宽度 / 板块 / 涨停梯队 / 自选股）和「AI 财报」页（Pi Agent 自动分析美股/A股/港股财报）。
 页面本身不联网：行情由脚本写进同目录 `data.js`，浏览器直接打开 `index.html` 即可。
 
-## 在线访问（两个入口）
+## 在线访问
 
-**自建（主入口，推荐）：https://watch.moonchan.xyz/** — cloudcone 主机上的 nginx 静态站，服务器自己每天抓数，与中国行情接口同网，不受境外 runner 502 影响。
-
-**GitHub Pages（备份）：https://hana-ame.github.io/market-watch/** — Actions 部署；境外 runner 偶发被东财 502，页面有 A股兜底快照。
+**GitHub Pages（唯一入口）：https://hana-ame.github.io/market-watch/** — Actions 部署；境外 runner 偶发被东财 502，页面有 A股兜底快照。
 
 GitHub 仓库（代码镜像）：https://github.com/Hana-ame/market-watch （PUBLIC）
-- GitHub Actions **每天一次**跑 `fetch_market.py`（cron `10 15 * * *` = 北京时间 23:10），把 `index.html` + 生成的 `data.js` 作为 Pages 产物部署；`data.js` 不入库。选 23:10 是为了同时包含 A股收盘、国内夜盘开盘和美盘早段。
+- GitHub Actions **每天早/中/晚三次**跑 `fetch_market.py` + 财报分析（cron `17 0` / `17 4` / `17 12` UTC = 北京 08:17 / 12:17 / 20:17），把 `index.html` + 生成的 `data.js` + `earnings/` 作为 Pages 产物部署；`data.js` 不入库。
 - `data/history.json` 每个交易日只回写一次（要求已收盘、无降级、当日尚未记录），用于「近期节奏」多日累积。
 - 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；全市场分页已降到 6 并发 + 每页 4 次指数退避，自选股拆两批独立重试，最近一次 run 无降级。
 
-## 自建服务（当前主入口）
+## GitHub Pages 更新保障
 
-- 主机：`cloudcone`（`117.55.237.217` / `cloudcone.moonchan.xyz`），站点目录 `/var/www/market-watch`。
-- nginx：`/etc/nginx/sites-enabled/watch-moonchan.conf`，`watch.moonchan.xyz` 直接对源站（Cloudflare DNS-only），TLS 复用 `*.moonchan.xyz` 泛域名证书，HTTP 自动 301 到 HTTPS。
-- 定时：systemd `market-watch.timer`，`OnCalendar=*-*-* 23:10:00 Asia/Shanghai`（`Persistent=true`，关机错过会补跑）→ `market-watch.service` 执行 `/var/www/market-watch/update.sh`。
-- 手动刷新：`ssh cloudcone 'systemctl start market-watch'`；页面数据在 `/var/www/market-watch/data.js`，页面每 60 秒自动重载。
-- 部署方式：把以下文件传到 `/var/www/market-watch` 即可；服务器已装 Python 3.11 + requests。
-  - 页面：`index.html` / `cycle.html` / `liquidity.html` / `reserves.html`
-  - 抓数脚本：`fetch_market.py` / `fetch_history.py` / `fetch_liquidity.py` / `fetch_reserves.py`
-  - 调度：`update.sh`（服务器上由 systemd 每天 23:10 执行，须包含全部 4 个 fetch_* 调用）
-  - 数据缓存：`data/fred/*.csv`（FRED 序列，可选——脚本会现抓并落盘；缺省时首次运行会从 FRED 完整拉取）
-  - 生成产物 `data.js` / `rates.js` / `liquidity.js` / `reserves.js` 不入 git，由服务器每次刷新时生成。
+目标是**每天更新三次**（用户口径：早/中/晚）。GitHub 的 `schedule` 是 best-effort（可能延迟、合并甚至长时间不触发），所以仍有兜底：
 
-## GitHub Pages 更新保障（备份链路）
-
-目标是**每天更新一次**（用户口径：每天）。GitHub 的 `schedule` 是 best-effort（可能延迟、合并甚至长时间不触发），所以仍有兜底：
-
-1. **定时**：`10 15 * * *`（UTC，即北京时间 23:10）触发 workflow；
+1. **定时**：`17 0` / `17 4` / `17 12`（UTC，即北京 08:17 / 12:17 / 20:17）触发 workflow；
 2. **手动/兜底**：workflow 支持 `repository_dispatch`，可随时触发一次：
    ```sh
    gh api -X POST repos/Hana-ame/market-watch/dispatches -f event_type=refresh
    ```
-3. **本机看门狗**：`remote_watchdog.sh`（WSL cron 每天 23:40）读取线上 `data.js` 的 `generated_ts`，超过 26 小时未更新才 dispatch；线上正常时只做一次 curl。
+3. **本机看门狗**：`remote_watchdog.sh`（WSL cron）读取线上 `data.js` 的 `generated_ts`，超过 26 小时未更新才 dispatch；线上正常时只做一次 curl。
 3. **A股兜底快照**：CI 在「已收盘 + 无降级」时把 A股区块（指数/宽度/板块/涨停/自选）写入 `data/fallback.json` 并在每个交易日回写一次；若某次境外取数被东财 502，脚本用该快照填充 A股页，页头标注「N 个数据源降级」，主看板块（金/油/日元/矿业）不受影响。
 4. **push 触发**：改代码/文档推送 main 也会立即刷新并部署一次。
-5. **开机兜底**：Windows 计划任务 `MarketWatch-Refresh`（工作日 09:20 / 15:10）跑 `daily_guard.sh` = 本地刷新 + 线上看门狗（阈值 26h），漏跑时补一次。
 
 ## 本地运行
 
@@ -106,7 +90,7 @@ E:\market-watch\index.html
 - **分析**：CI 里用 Pi Coding Agent（`pi --provider google --model gemini-3-flash-preview -p "$(cat prompt.md)"`）读 raw 数据、生成含市场总览/三市场卡片/风险提示的 `dist/earnings/index.html`；LLM 密钥走 GitHub Secret `GEMINI_API_KEY`。
 - **调度**：`.github/workflows/update.yml` 每天**早/中/晚**三次（北京 08:17 / 12:17 / 20:17）跑完整站点 + 财报分析并部署 Pages。
 - **免责声明**：页面底部固定「数据来自公开渠道（SEC EDGAR / 东方财富），分析由 AI 自动生成，仅供参考，不构成投资建议」。
-- **自托管**：服务器 `update.sh` 无 GEMINI key 时自动从 GitHub Pages 镜像 `/earnings/index.html`，保证 `watch.moonchan.xyz/earnings/` 不 404。
+- **部署**：仅 GitHub Pages（`/market-watch/earnings/`），由 CI 生成并发布；不依赖自托管。
 
 ## 数据与刷新
 
