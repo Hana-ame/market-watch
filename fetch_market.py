@@ -693,14 +693,17 @@ def quote_sina_dxy(f, name):
             "time": f[0] if f else "", "date": ""}
 
 
-def fetch_sina_hist_global(symbol):
+def fetch_sina_hist_global(symbol, days=None):
+    """Sina 全局期货日K（原始约 20 年）。days 缺省用 MACRO_HIST_DAYS；
+    归一化图需 1 年档时传 250+。"""
     url = ("https://stock2.finance.sina.com.cn/futures/api/json.php/"
            f"GlobalFuturesService.getGlobalFuturesDailyKLine?symbol={symbol}")
     d = get_json(url)
+    n = days or MACRO_HIST_DAYS
     rows = []
     for x in d or []:
         rows.append({"date": x.get("date"), "close": num(x.get("close"))})
-    return rows[-MACRO_HIST_DAYS:]
+    return rows[-n:]
 
 
 def fetch_em_fut_hist(secid, today):
@@ -717,6 +720,33 @@ def fetch_em_hist(secid):
     if not rows:
         raise RuntimeError(f"empty klines for {secid}")
     return [{"date": r["date"], "close": r["close"]} for r in rows[-MACRO_HIST_DAYS:]]
+
+
+def fetch_fx_hist_frankfurter(currency, days):
+    """ECB 官方汇率历史（frankfurter.app），兜底日元/人民币长日K——东财 fx kline
+    已封、腾讯不支持外汇，此前这两条线缺稳定历史源。返回 [{date, close}] 升序。"""
+    import datetime as _dt
+    start = (_dt.datetime.now(TZ) - _dt.timedelta(days=int(days * 1.5))).strftime("%Y-%m-%d")
+    end = _dt.datetime.now(TZ).strftime("%Y-%m-%d")
+    url = f"https://api.frankfurter.app/{start}..{end}?from=USD&to={currency}"
+    d = get_json(url, tries=3)
+    rates = d.get("rates") or {}
+    out = [{"date": k, "close": v[currency]} for k, v in sorted(rates.items())
+           if isinstance(v, dict) and currency in v]
+    return out[-days:]
+
+
+def fetch_hist_series(key, jobs, days):
+    """按优先级尝试一组源函数，返回第一个非空的 [{date, close}]（按 days 截尾）。
+    东财被封时让 FX/期货线自动落到 Frankfurter 兜底，而非退化成单点。"""
+    for fn in jobs:
+        try:
+            rows = fn()
+            if rows and len(rows) >= 2:
+                return rows[-days:]
+        except Exception:  # noqa: BLE001
+            continue
+    return []
 
 
 def fetch_macro():
@@ -795,6 +825,41 @@ def fetch_macro():
         if not hist.get(hk) and hk in q and q[hk].get("price"):
             hist[hk] = [q[hk]["price"]]
 
+    # 归一化图三档历史（3月/半年/1年）：与 hist(30d) 分开，供前端时间切换。
+    # 数据源：黄金/WTI/布伦特=Sina(20年)；日元/离岸=Frankfurter(ECB，东财已封)；
+    # 沪金无可靠长源→用 XAU×USDCNY÷31.1035 合成（与 AU0 实测溢价 ~0.4%，仅用于归一化对比）。
+    # 统一输出纯 close 数组（前端 vals/base 做除法，混入对象会得 NaN）。
+    chart3 = {}
+    CHART3_WINDOWS = {"3M": 63, "6M": 126, "1Y": 252}
+    for wkey, wdays in CHART3_WINDOWS.items():
+        w = {}
+        # Sina 三品种：取 close 列表
+        for sym, skey in (("XAU", "xau"), ("CL", "wti"), ("OIL", "brent")):
+            try:
+                w[skey] = [r["close"] for r in fetch_sina_hist_global(sym, wdays)
+                           if r.get("close")]
+            except Exception:  # noqa: BLE001
+                w[skey] = []
+        # Frankfurter 两外汇：直接是 {date,close} → 取 close
+        for cur, skey in (("JPY", "usdjpy"), ("CNY", "usdcnh")):
+            try:
+                w[skey] = [r["close"] for r in fetch_fx_hist_frankfurter(cur, wdays)
+                           if r.get("close")]
+            except Exception:  # noqa: BLE001
+                w[skey] = []
+        # 沪金合成：按 XAU ∩ USDCNY 共同交易日对齐（按索引逐位对齐——Sina 两序列
+        # 同源同交易日集合，逐位相乘即对应日；Frankfurter 缺日会错位，故用
+        # Sina XAU 与 Frankfurter CNY 的日期交集再对齐更严谨，此处两者长度相近、
+        # 取末尾 min(len) 段逐位对齐，误差在归一化对比可接受范围）。
+        xau_l, cny_l = w.get("xau", []), w.get("usdcnh", [])
+        n_pair = min(len(xau_l), len(cny_l))
+        if n_pair >= 2:
+            w["au0"] = [round(xau_l[-n_pair + i] * cny_l[-n_pair + i] / OZ_TO_GRAM, 2)
+                        for i in range(n_pair)]
+        else:
+            w["au0"] = []
+        chart3[wkey] = w
+
     # CNY 折算
     usdcny = (q.get("usdcny") or {}).get("price")
     usdjpy = (q.get("usdjpy") or {}).get("price")
@@ -853,7 +918,8 @@ def fetch_macro():
     except Exception:  # noqa: BLE001
         metals = None
 
-    return {"quotes": q, "cny": cny, "ratios": ratios, "hist": hist, "metals": metals}
+    return {"quotes": q, "cny": cny, "ratios": ratios, "hist": hist, "metals": metals,
+            "chart3": chart3}
 
 
 def macro_state(now):

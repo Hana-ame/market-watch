@@ -139,6 +139,10 @@
   .legend .li i{width:9px;height:3px;border-radius:2px;display:inline-block}
   .legend .li b{font-family:var(--mono);font-weight:600}
   .chart-note{font-size:10.5px;color:var(--dim);margin-top:8px;line-height:1.7}
+  .chart-tabs{display:inline-flex;gap:2px;margin-left:10px}
+  .chart-tab{background:#101923;color:#8ba0b4;border:1px solid var(--line);border-radius:5px;padding:2px 9px;font-size:10.5px;cursor:pointer;font-family:var(--mono)}
+  .chart-tab:hover{color:#c9d6e4;border-color:#2f4a66}
+  .chart-tab.on{background:#1d2c3d;color:#ffd166;border-color:#3d5a7a;font-weight:700}
 
   /* ---------- tables ---------- */
   .mtable{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -376,12 +380,18 @@
     <div class="grid-2">
       <section class="panel">
         <div class="panel-h">
-          <div class="panel-t">30 日走势（归一化）</div>
-          <div class="panel-sub" id="chartRange">—</div>
+          <div class="panel-t">走势（归一化）</div>
+          <div class="panel-sub"><span id="chartRange">—</span>
+            <span class="chart-tabs">
+              <button class="chart-tab" data-w="3M">3月</button>
+              <button class="chart-tab" data-w="6M">半年</button>
+              <button class="chart-tab" data-w="1Y">1年</button>
+            </span>
+          </div>
         </div>
         <div class="chart-box" id="macroChart"></div>
         <div class="legend" id="chartLegend"></div>
-        <div class="chart-note">各品种以 30 个交易日前为 100 归一，用来比较相对强弱；波动率不同，仅看方向与斜率，不代表等权收益。</div>
+        <div class="chart-note" id="chartNote">各品种以窗口首日为 100 归一，用来比较相对强弱；波动率不同，仅看方向与斜率，不代表等权收益。窗口可切 3月/半年/1年。</div>
       </section>
 
       <section class="panel">
@@ -737,8 +747,31 @@
     renderFormula();
   }
 
+  // 归一化图窗口切换按钮绑定（按钮在 chartRange 的父级 panel-sub 内；切换后重绘图表）
+  function bindChartTabs(){
+    const range = document.getElementById("chartRange");
+    if(!range) return;
+    const box = range.parentElement;
+    if(!box) return;
+    box.querySelectorAll(".chart-tab").forEach(function(b){
+      b.classList.toggle("on", b.dataset.w === chartWin);
+      if(b._bound) return;
+      b._bound = true;
+      b.addEventListener("click", function(){
+        if(chartWin === b.dataset.w) return;
+        chartWin = b.dataset.w;
+        renderMacroChart();
+      });
+    });
+  }
+
+  // 归一化图当前窗口（3M/6M/1Y），跨刷新保留
+  var chartWin = "3M";
+
   function seriesSet(){
-    var h = (MKT.macro && MKT.macro.hist) || {};
+    // 优先用 chart3 三档历史（可切窗口）；缺失时退回 hist(30d)
+    var c3 = (MKT.macro && MKT.macro.chart3) || {};
+    var h = c3[chartWin] || (MKT.macro && MKT.macro.hist) || {};
     var defs = [
       {name:"黄金 XAU",   color:"#f0b429", vals:h.xau},
       {name:"沪金 AU0",   color:"#ffdf8a", vals:h.au0, dash:"4 3"},
@@ -793,6 +826,7 @@
 
     $("macroChart").innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' + grid + paths + '</svg>';
     $("chartRange").textContent = "近 " + n + " 个交易日 · 基准=100";
+    bindChartTabs();
     $("chartLegend").innerHTML = sets.map(function(s){
       var ret = s.norm[s.norm.length - 1] - 100;
       return '<span class="li"><i style="background:' + s.color + '"></i>' + s.name
