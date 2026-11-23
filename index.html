@@ -1695,9 +1695,13 @@
     // 更新区间说明
     var names = {"1W":"近一周","1M":"近一月","3M":"近三月","1Y":"近一年","10Y":"近十年"};
     var n = PRICE_SLICE[priceRange] || 2500;
+    // 数据源说明按品种区分（指数走腾讯日线，外汇走 ECB，商品走 Sina）
+    var isIdx = ["1.000001","0.399001","0.399006","1.000688","1.000300"].indexOf(priceSym) >= 0;
+    var src = isIdx ? "腾讯财经（A股指数日线，约 2 年）"
+            : (priceSym === "usdjpy" || priceSym === "usdcnh"
+               ? "Frankfurter（ECB，最长约 10 年）" : "Sina 全局期货日线");
     $("pcNote").textContent = names[priceRange] + "（" + Math.min(n, vals.length) + " 个交易日）· "
-      + "Y 轴为真实价格。数据源：" + (priceSym === "usdjpy" || priceSym === "usdcnh"
-          ? "Frankfurter（ECB，最长约 10 年）" : "Sina 全局期货日线");
+      + "Y 轴为真实价格。数据源：" + src;
 
     // 周期涨跌摘要条：一次性算该品种各档涨跌幅（基于 chart3 长序列，不受当前窗口影响）
     var sumEl = document.getElementById("pcSummary");
