@@ -1,6 +1,6 @@
 # 每日看盘 · market-watch
 
-本地运行的每日盯盘面板，**主看 XAUUSD 黄金、WTI/布伦特原油、USD/JPY 日元，并把三者折成人民币价**（元/克、元/桶、元/百日元）；另有「矿业期货」页签（有色 / 黑色 / 铁合金 / 新能源金属 / LME·COMEX 内外盘）、「A股盘面」页签（指数 / 涨跌宽度 / 板块 / 涨停梯队 / 自选股）和「AI 财报」页（Pi Agent 自动分析美股/A股/港股财报）。
+本地运行的每日盯盘面板，**主看 XAUUSD 黄金、WTI/布伦特原油、USD/JPY 日元，并把三者折成人民币价**（元/克、元/桶、元/百日元）；另有「矿业期货」页签（有色 / 黑色 / 铁合金 / 新能源金属 / LME·COMEX 内外盘）、「A股盘面」页签（指数 / 涨跌宽度 / 板块 / 涨停梯队 / 自选股 / 筹码分布）和「财报数据」页（确定性渲染美股/A股/港股财报，无 AI 生成）。
 页面本身不联网：行情由脚本写进同目录 `data.js`，浏览器直接打开 `index.html` 即可。
 
 ## 在线访问
@@ -83,13 +83,13 @@ E:\market-watch\index.html
 
 更新方式：`python3 fetch_reserves.py [--if-stale 20]`，产物 `reserves.js`（`window.RESERVES`）不入库，由 CI 生成后随 Pages 一并部署。
 
-## AI 财报分析页（`earnings/`）
+## 财报数据页（`earnings/`）
 
-- **入口**：主站导航「AI 财报」→ `earnings/index.html`（GitHub Pages 部署到 `/market-watch/earnings/`）。
-- **数据**：`fetch_earnings.py` 确定性抓取三市场——美股 SEC EDGAR XBRL `companyfacts`（AAPL/MSFT/NVDA 等）、A股东方财富 `RPT_LICO_FN_CPD` 业绩报表、港股东方财富 `RPT_HKF10_FN_MAININDICATOR`（腾讯/阿里/美团），输出 `data/earnings_raw.json`。
-- **分析**：CI 里用 Pi Coding Agent（`pi --provider google --model gemini-3.1-flash-lite --offline --no-session -p "$(cat prompt.md)"`）读 raw 数据、生成含市场总览/三市场卡片/风险提示的 `dist/earnings/index.html`；LLM 密钥走 GitHub Secret `GEMINI_API_KEY`。模型选 **gemini-3.1-flash-lite**（Free Tier 独立配额桶；`gemini-3-flash` 仅 20 次/天且 `-preview` 会被归一化，易撞 429）。`--offline --no-session` 禁用启动网络检查/会话持久化，规避 CI 无 TTY 下 pi 卡死（实测 CI 里 10s 完成）。pi 三次重试全失败时，部署仓库兜底页 `earnings/index.html`，保证 `/earnings/` 始终可访问。
-- **调度**：`.github/workflows/update.yml` **每 6 小时窗口**（北京 09:17 / 17:17 / 次日 01:17）跑完整站点 + 财报分析并部署 Pages。
-- **免责声明**：页面底部固定「数据来自公开渠道（SEC EDGAR / 东方财富），分析由 AI 自动生成，仅供参考，不构成投资建议」。
+- **入口**：主站导航「财报数据」→ `earnings/index.html`（GitHub Pages 部署到 `/market-watch/earnings/`）。
+- **数据**：`fetch_earnings.py` 确定性抓取三市场——美股 SEC EDGAR XBRL `companyfacts`（AAPL/MSFT/NVDA 等，所有指标对齐同一报告期）、A股东方财富 `RPT_LICO_FN_CPD` 业绩报表（营收降序取龙头）、港股东方财富 `RPT_HKF10_FN_MAININDICATOR`（腾讯/阿里/美团），输出 `data/earnings_raw.json`。
+- **渲染**：`build_earnings.py` 读 raw 数据，**确定性生成** `dist/earnings/index.html`（数字直接展示、点评由规则从数字推导）。**不使用 LLM**——原先用 Pi Agent/Gemini 生成点评，实测会编造（把真实数字丢掉写成「现金流极其强劲」等套话，甚至出现净利 > 营收的错期数据），故砍掉。
+- **调度**：`.github/workflows/update.yml` **每 6 小时窗口**（北京 09:17 / 17:17 / 次日 01:17）跑完整站点并部署 Pages。
+- **免责声明**：页面底部固定「数据来自公开渠道（SEC EDGAR / 东方财富），仅供参考，不构成投资建议」。
 - **部署**：仅 GitHub Pages（`/market-watch/earnings/`），由 CI 生成并发布；不依赖自托管。
 
 ## 数据与刷新
@@ -124,9 +124,9 @@ E:\market-watch\index.html
 | `reserves.html` | 银行准备金页：准备金 vs 安全线 / 占 GDP / TGA + ON RRP / 关键事件 |
 | `reserves.js` | 脚本生成的准备金快照（`window.RESERVES`），CI 生成不入库 |
 | `fetch_reserves.py` | 取 FRED WRESBAL / WTREGEN / RRPONTSYD / WDTGAL / WLRRAL + GDP + IORB/IORR/DFEDTARU/DFEDTARL/SOFR，生成 `reserves.js` |
-| `earnings/` | AI 财报分析页（Pi Agent 生成，含免责声明），部署到 `site/earnings/index.html` |
+| `earnings/` | 财报数据页（确定性渲染，含免责声明），部署到 `site/earnings/index.html` |
 | `fetch_earnings.py` | 取 SEC EDGAR（美股）+ 东方财富（A股/港股）财报，生成 `data/earnings_raw.json` |
-| `prompt.md` | 给 Pi Agent 的财报分析指令（读 raw → 分析 → 写 `dist/earnings/index.html`） |
+| `build_earnings.py` | 读 raw 数据确定性渲染 `dist/earnings/index.html`（不使用 LLM） |
 | `fetch_market.py` | 取数 + 统计 + 生成 `data.js` / `data/latest.json` / 历史 |
 | `update.sh` | 带文件锁的单次刷新入口（cron、计划任务、手动共用） |
 | `update.bat` | Windows 双击刷新（转调 WSL 的 update.sh） |
