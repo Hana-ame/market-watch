@@ -1686,6 +1686,8 @@
         });
       } else {
         rsiBlock.hidden = true;   // 短窗口（一周/一月）点数不足，不显示 RSI
+        var rve = document.getElementById("rsiVal");
+        if(rve){ rve.textContent = "—"; rve.className = "rsi-val"; }
         if(rsiChartInst){ rsiChartInst.destroy(); rsiChartInst=null; }
       }
     }
