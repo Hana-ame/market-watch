@@ -762,11 +762,15 @@ def fetch_metals(usdcny):
         groups.append({"name": "国际（折人民币）", "items": intl_rows})
 
     # 30 日历史（国内主连日线并发；国际用新浪全球期货日线）
+    price_by = {k: p for _, items in METALS for (k, n, c, em, u) in items
+                for p in [next((it["price"] for it in groups if it["key"] == k), None)]}
     def job(k, em):
         try:
-            return k, [r["close"] for r in fetch_em_fut_hist(em, today)]
+            rows = [r["close"] for r in fetch_em_fut_hist(em, today)]
+            # 东财 kline 偶发失败/空时用当前价单点占位，避免 hist 空导致 mini 图无数据
+            return k, rows if rows else ([price_by[k]] if price_by.get(k) else [])
         except Exception:  # noqa: BLE001
-            return k, []
+            return k, ([price_by[k]] if price_by.get(k) else [])
     with ThreadPoolExecutor(10) as ex:
         for k, rows in ex.map(lambda t: job(t[0], t[1]), [(k, em) for (k, _, _, em, _) in domestic]):
             hist[k] = rows
