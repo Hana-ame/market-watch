@@ -825,40 +825,32 @@ def fetch_macro():
         if not hist.get(hk) and hk in q and q[hk].get("price"):
             hist[hk] = [q[hk]["price"]]
 
-    # 归一化图三档历史（3月/半年/1年）：与 hist(30d) 分开，供前端时间切换。
+    # 归一化图历史：取一条 500 交易日长序列，前端按 周(5)/月(21)/年(250) 切片显示。
     # 数据源：黄金/WTI/布伦特=Sina(20年)；日元/离岸=Frankfurter(ECB，东财已封)；
     # 沪金无可靠长源→用 XAU×USDCNY÷31.1035 合成（与 AU0 实测溢价 ~0.4%，仅用于归一化对比）。
     # 统一输出纯 close 数组（前端 vals/base 做除法，混入对象会得 NaN）。
+    CHART_MAX_DAYS = 500
     chart3 = {}
-    CHART3_WINDOWS = {"3M": 63, "6M": 126, "1Y": 252}
-    for wkey, wdays in CHART3_WINDOWS.items():
-        w = {}
-        # Sina 三品种：取 close 列表
-        for sym, skey in (("XAU", "xau"), ("CL", "wti"), ("OIL", "brent")):
-            try:
-                w[skey] = [r["close"] for r in fetch_sina_hist_global(sym, wdays)
-                           if r.get("close")]
-            except Exception:  # noqa: BLE001
-                w[skey] = []
-        # Frankfurter 两外汇：直接是 {date,close} → 取 close
-        for cur, skey in (("JPY", "usdjpy"), ("CNY", "usdcnh")):
-            try:
-                w[skey] = [r["close"] for r in fetch_fx_hist_frankfurter(cur, wdays)
-                           if r.get("close")]
-            except Exception:  # noqa: BLE001
-                w[skey] = []
-        # 沪金合成：按 XAU ∩ USDCNY 共同交易日对齐（按索引逐位对齐——Sina 两序列
-        # 同源同交易日集合，逐位相乘即对应日；Frankfurter 缺日会错位，故用
-        # Sina XAU 与 Frankfurter CNY 的日期交集再对齐更严谨，此处两者长度相近、
-        # 取末尾 min(len) 段逐位对齐，误差在归一化对比可接受范围）。
-        xau_l, cny_l = w.get("xau", []), w.get("usdcnh", [])
-        n_pair = min(len(xau_l), len(cny_l))
-        if n_pair >= 2:
-            w["au0"] = [round(xau_l[-n_pair + i] * cny_l[-n_pair + i] / OZ_TO_GRAM, 2)
-                        for i in range(n_pair)]
-        else:
-            w["au0"] = []
-        chart3[wkey] = w
+    w = {}
+    for sym, skey in (("XAU", "xau"), ("CL", "wti"), ("OIL", "brent")):
+        try:
+            w[skey] = [r["close"] for r in fetch_sina_hist_global(sym, CHART_MAX_DAYS)
+                       if r.get("close")]
+        except Exception:  # noqa: BLE001
+            w[skey] = []
+    for cur, skey in (("JPY", "usdjpy"), ("CNY", "usdcnh")):
+        try:
+            w[skey] = [r["close"] for r in fetch_fx_hist_frankfurter(cur, CHART_MAX_DAYS)
+                       if r.get("close")]
+        except Exception:  # noqa: BLE001
+            w[skey] = []
+    # 沪金合成：XAU × USDCNY ÷ 31.1035。Sina 两序列同源同交易日，逐位对齐；
+    # 取末尾 min(len) 段保证各线等长（归一化对比可接受范围）。
+    xau_l, cny_l = w.get("xau", []), w.get("usdcnh", [])
+    n_pair = min(len(xau_l), len(cny_l))
+    w["au0"] = ([round(xau_l[-n_pair + i] * cny_l[-n_pair + i] / OZ_TO_GRAM, 2)
+                 for i in range(n_pair)] if n_pair >= 2 else [])
+    chart3 = w
 
     # CNY 折算
     usdcny = (q.get("usdcny") or {}).get("price")
