@@ -1563,6 +1563,10 @@
     var start = Math.max(0, allC.length - take);
     var dates = allDates.slice(start);
     var vals = allC.slice(start);
+    if(!vals.length){
+      document.getElementById("priceChart").innerHTML = '<div class="empty">暂无价格数据（数据源受限或盘前）</div>';
+      return;
+    }
 
     // 移动平均线：在切片前用全序列计算（否则窗口起点处 MA 值不准）。
     // ma(n) 返回与 vals 等长的数组；前 n-1 个点数据不足记 null（Chart.js 断线）。
