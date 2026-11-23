@@ -410,6 +410,7 @@
       </div>
     </div>
     <div class="chart-box" style="height:320px"><canvas id="priceChart"></canvas></div>
+    <div class="cyq-meta" id="pcSummary" style="margin-top:8px">—</div>
     <div class="chart-note" id="pcNote">Y 轴为真实价格（非归一化）。数据源：Sina 全局期货日线 / Frankfurter（ECB）。</div>
   </section>
 
@@ -1537,10 +1538,21 @@
         }
       },
       scales: {
-        x: {display:true, ticks:{display:true, maxTicksLimit:8, color:"#8496ab",
-              font:{family:"monospace", size:10},
-              callback:function(v){ return (dates[v] || "").slice(2); }},
-            grid:{display:false}},
+        x: {display:true,
+            ticks:{display:true, color:"#8496ab", font:{family:"monospace", size:10},
+                   callback:function(v){ return (dates[v] || "").slice(2); },
+                   maxRotation:0, autoSkip:true},
+            grid:{display:false},
+            afterBuildTicks:function(ax){
+              // 均匀取 8 个刻度索引（数据点不等距，maxTicksLimit 会漏点/空白）
+              var len = ax.getLabels().length;
+              if(!len) return;
+              var want = 8, step = Math.max(1, Math.floor((len-1)/(want-1)));
+              var idx = [];
+              for(var i=0;i<len;i+=step) idx.push(i);
+              if(idx[idx.length-1] !== len-1) idx.push(len-1);
+              ax.ticks = idx.map(function(i){ return {value:i, label: (dates[i]||"").slice(2)}; });
+            }},
         y: {display:true, position:"right",
             ticks:{color:"#8496ab", font:{family:"monospace", size:11},
                    callback:function(v){ return v.toFixed(meta.dp); }},
@@ -1556,6 +1568,23 @@
     $("pcNote").textContent = names[priceRange] + "（" + Math.min(n, vals.length) + " 个交易日）· "
       + "Y 轴为真实价格。数据源：" + (priceSym === "usdjpy" || priceSym === "usdcnh"
           ? "Frankfurter（ECB，最长约 10 年）" : "Sina 全局期货日线");
+
+    // 周期涨跌摘要条：一次性算该品种各档涨跌幅（基于 chart3 长序列，不受当前窗口影响）
+    var sumEl = document.getElementById("pcSummary");
+    if(sumEl){
+      var allC = raw.c || (Array.isArray(raw) ? raw : []);
+      var spans = [["1周",5],["1月",21],["3月",63],["1年",250],["10年",2500]];
+      var cells = spans.map(function(sp){
+        var k = Math.min(sp[1], allC.length);
+        if(allC.length < 2 || k < 2) return '<span><b style="color:var(--dim)">—</b> ' + sp[0] + '</span>';
+        var last = allC[allC.length-1], base = allC[allC.length-k];
+        var chg = (last/base - 1) * 100;
+        var sign = chg > 0 ? "+" : "";
+        var col = chg > 0 ? "#ff6b78" : (chg < 0 ? "#0ecb81" : "#8496ab");
+        return '<span><b style="color:' + col + '">' + sign + chg.toFixed(1) + '%</b> ' + sp[0] + '</span>';
+      }).join(" · ");
+      sumEl.innerHTML = cells;
+    }
   }
 
   // 品种/时间控件绑定
