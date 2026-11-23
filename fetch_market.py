@@ -457,6 +457,17 @@ def quote_sina_fx(f, name):
             "time": f[0] if f else "", "date": ""}
 
 
+def quote_sina_dxy(f, name):
+    """新浪美元指数 DINIW：1现价 5昨收 0时间（字段布局与 fx_ 不同）"""
+    price, prev = _num(f, 1), _num(f, 5)
+    pct = None
+    if price and prev:
+        pct = (price / prev - 1) * 100
+    return {"name": name, "price": price, "prev": prev,
+            "pct": round(pct, 2) if pct is not None else None,
+            "time": f[0] if f else "", "date": ""}
+
+
 def fetch_sina_hist_global(symbol):
     url = ("https://stock2.finance.sina.com.cn/futures/api/json.php/"
            f"GlobalFuturesService.getGlobalFuturesDailyKLine?symbol={symbol}")
@@ -485,7 +496,8 @@ def fetch_em_hist(secid):
 
 def fetch_macro():
     codes = ["hf_XAU", "hf_XAG", "hf_CL", "hf_OIL", "nf_AU0", "nf_SC0",
-             "gds_AUTD", "fx_susdcny", "fx_susdjpy", "fx_sjpycny"]
+             "gds_AUTD", "fx_susdcny", "fx_susdjpy", "fx_sjpycny",
+             "fx_susdcnh", "DINIW"]
     raw = fetch_sina(codes)
     q = {}
     if "hf_XAU" in raw:
@@ -508,18 +520,23 @@ def fetch_macro():
         q["usdjpy"] = quote_sina_fx(raw["fx_susdjpy"], "美元/日元")
     if "fx_sjpycny" in raw:
         q["jpycny"] = quote_sina_fx(raw["fx_sjpycny"], "日元/人民币")
+    # 离岸人民币 / 美元指数：新浪为主（不触发东财限流），东财补充作 fallback（下方 try）
+    if "fx_susdcnh" in raw:
+        q["usdcnh"] = quote_sina_fx(raw["fx_susdcnh"], "离岸人民币 USD/CNH")
+    if "DINIW" in raw:
+        q["dxy"] = quote_sina_dxy(raw["DINIW"], "美元指数 DXY")
 
     if "xau" not in q:
         raise RuntimeError("macro quotes empty (sina)")
-    # 东财补充：离岸人民币、美元指数（新浪无）
+    # 东财补充：离岸人民币、美元指数——仅当新浪缺失时用（新浪为主，东财作 fallback）
     try:
         d = get_json("https://push2.eastmoney.com/api/qt/ulist.np/get"
                      "?fltt=2&invt=2&secids=133.USDCNH,100.UDI&fields=f2,f3,f12,f14,f60")
         for x in ((d.get("data") or {}).get("diff") or []):
-            if str(x.get("f12")) == "USDCNH":
+            if str(x.get("f12")) == "USDCNH" and not q.get("usdcnh"):
                 q["usdcnh"] = {"name": "离岸人民币 USD/CNH", "price": num(x.get("f2")),
                                "pct": num(x.get("f3"))}
-            elif str(x.get("f12")) == "UDI":
+            elif str(x.get("f12")) == "UDI" and not q.get("dxy"):
                 q["dxy"] = {"name": "美元指数 DXY", "price": num(x.get("f2")),
                             "pct": num(x.get("f3"))}
     except Exception:  # noqa: BLE001
