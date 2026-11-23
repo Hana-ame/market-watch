@@ -1763,6 +1763,9 @@
                ? "Frankfurter（ECB，最长约 10 年）" : "Sina 全局期货日线");
     $("pcNote").textContent = spanTxt + "（" + Math.min(n, vals.length) + " 个交易日）· "
       + "Y 轴为真实价格。数据源：" + src;
+    // 动态更新 aria-label 反映当前品种（可访问性）
+    var pcCanvas = document.getElementById("priceChart");
+    if(pcCanvas){ pcCanvas.setAttribute("aria-label", meta.name + " 价格走势图：显示价格走势、MA50/MA200 均线，悬停查看具体数值"); }
 
     // 周期涨跌摘要条：一次性算该品种各档涨跌幅（基于 chart3 长序列，不受当前窗口影响）
     var sumEl = document.getElementById("pcSummary");
