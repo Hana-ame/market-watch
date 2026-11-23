@@ -155,6 +155,8 @@
   .rsi-val{font-family:var(--mono);color:#e6eef7}
   .rsi-val.overbought{color:#ff6b78}
   .rsi-val.oversold{color:#0ecb81}
+  .rsi-val.near-hot{color:#e0a458}
+  .rsi-val.near-cold{color:#8496ab}
   .chart-tab{background:#101923;color:#8ba0b4;border:1px solid var(--line);border-radius:5px;padding:2px 9px;font-size:10.5px;cursor:pointer;font-family:var(--mono)}
   .chart-tab:hover{color:#c9d6e4;border-color:#2f4a66}
   .chart-tab.on{background:#1d2c3d;color:#ffd166;border-color:#3d5a7a;font-weight:700}
@@ -1680,9 +1682,9 @@
       if(vals.length >= 20 && rsiVals.length){
         rsiBlock.hidden = false;
         var rsiLast = rsiVals[rsiVals.length-1];
-        var rsiCls = rsiLast >= 70 ? "overbought" : (rsiLast <= 30 ? "oversold" : "");
+        var rsiCls = rsiLast >= 70 ? "overbought" : rsiLast >= 60 ? "near-hot" : rsiLast <= 30 ? "oversold" : rsiLast <= 40 ? "near-cold" : "";
         // 边界区提示：30-40 接近超卖、60-70 接近超买（比纯三态更细）
-        var rsiState = rsiLast >= 70 ? " 超买" : rsiLast >= 60 ? " 偏热" : rsiLast <= 30 ? " 超卖" : rsiLast <= 40 ? " 偏冷" : " 中性";
+        var rsiState = rsiLast >= 70 ? " 超买" : rsiLast >= 60 ? " 偏热" : rsiLast <= 30 ? " 轧卖" : rsiLast <= 40 ? " 偏冷" : " 中性";
         var rsiValEl = document.getElementById("rsiVal");
         if(rsiValEl){
           rsiValEl.textContent = rsiLast.toFixed(1) + rsiState;
