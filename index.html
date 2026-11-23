@@ -146,7 +146,13 @@
   .legend .li b{font-family:var(--mono);font-weight:600}
   .chart-note{font-size:10.5px;color:var(--dim);margin-top:8px;line-height:1.7}
   .chart-tabs{display:inline-flex;gap:2px;margin-left:10px}
-  .pc-sel{background:#101923;color:#c9d6e4;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px;font-family:inherit;cursor:pointer}
+  .pc-syms{display:flex;flex-direction:column;gap:6px;flex:1}
+  .pc-group{display:flex;flex-direction:column;gap:4px}
+  .pc-group-label{font-size:10px;color:var(--dim);letter-spacing:.5px}
+  .pc-pills{display:flex;flex-wrap:wrap;gap:4px}
+  .pc-pill{background:#101923;color:#c9d6e4;border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:var(--mono)}
+  .pc-pill:hover{border-color:#3a5573;color:#fff}
+  .pc-pill.on{background:rgba(240,180,41,.15);color:#ffd479;border-color:rgba(240,180,41,.4)}
   .pc-now{font-family:var(--mono);font-size:13px;color:#e6eef7;margin-left:6px}
   .pc-now b{font-size:15px}
   .pc-now small{color:var(--dim);font-size:10px}
@@ -407,27 +413,33 @@
     <div class="panel-h">
       <div class="panel-t">价格走势</div>
       <div class="panel-sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="pcSym" class="pc-sel">
-          <optgroup label="商品 · 外汇 · 汇率">
-          <option value="xau">黄金 XAU/USD</option>
-          <option value="au0">沪金 AU0</option>
-          <option value="xag">白银 XAG/USD</option>
-          <option value="wti">WTI 原油</option>
-          <option value="brent">布伦特原油</option>
-          <option value="usdjpy">美元/日元</option>
-          <option value="usdcnh">美元/人民币 CNY</option>
-          </optgroup>
-          <optgroup label="A股指数">
-          <option value="1.000001">上证指数</option>
-          <option value="0.399001">深证成指</option>
-          <option value="0.399006">创业板指</option>
-          <option value="1.000688">科创50</option>
-          <option value="1.000300">沪深300</option>
-          <option value="1.000905">中证500</option>
-          <option value="1.000852">中证1000</option>
-          <option value="0.899050">北证50</option>
-          </optgroup>
-        </select>
+        <div class="pc-syms" id="pcSym">
+          <div class="pc-group">
+            <span class="pc-group-label">商品 · 外汇 · 汇率</span>
+            <div class="pc-pills">
+              <button class="pc-pill" data-v="xau">黄金 XAU</button>
+              <button class="pc-pill" data-v="au0">沪金 AU0</button>
+              <button class="pc-pill" data-v="xag">白银 XAG</button>
+              <button class="pc-pill" data-v="wti">WTI 原油</button>
+              <button class="pc-pill" data-v="brent">布伦特原油</button>
+              <button class="pc-pill" data-v="usdjpy">美元/日元</button>
+              <button class="pc-pill" data-v="usdcnh">美元/人民币 CNY</button>
+            </div>
+          </div>
+          <div class="pc-group">
+            <span class="pc-group-label">A股指数</span>
+            <div class="pc-pills">
+              <button class="pc-pill" data-v="1.000001">上证指数</button>
+              <button class="pc-pill" data-v="0.399001">深证成指</button>
+              <button class="pc-pill" data-v="0.399006">创业板指</button>
+              <button class="pc-pill" data-v="1.000688">科创50</button>
+              <button class="pc-pill" data-v="1.000300">沪深300</button>
+              <button class="pc-pill" data-v="1.000905">中证500</button>
+              <button class="pc-pill" data-v="1.000852">中证1000</button>
+              <button class="pc-pill" data-v="0.899050">北证50</button>
+            </div>
+          </div>
+        </div>
         <span class="chart-tabs" id="pcRange">
           <button class="chart-tab" data-r="1W">周</button>
           <button class="chart-tab" data-r="1M">月</button>
