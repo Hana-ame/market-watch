@@ -102,24 +102,6 @@ def _cik_map():
     return out
 
 
-def _gaap_pick(facts, aliases):
-    """从 us-gaap facts 里按别名优先级取最近一期 (val, end, unit)。"""
-    gaap = facts.get("facts", {}).get("us-gaap", {})
-    for key in aliases:
-        if key not in gaap:
-            continue
-        units = gaap[key].get("units", {})
-        best = None
-        for unit, arr in units.items():
-            if not arr:
-                continue
-            last = arr[-1]
-            if best is None or last.get("end", "") > best[0]:
-                best = (last.get("end", ""), last.get("val"), unit)
-        if best and best[1] is not None:
-            return best[2], best[1], best[0]
-    return None
-
 
 def _metrics_for_end(facts, ref_end):
     """给定基准财报期 ref_end，取该期（或与之最接近的期）的各指标，保证同一期口径。
