@@ -160,11 +160,37 @@ def fetch_quote_time():
     return None
 
 
+def fetch_kline_tencent(secid, limit=45):
+    """腾讯日线兜底：东财 push2his 对境外 runner 已整体返回 HTML 拦截页（kao）
+    → 图表日期全停在 fallback 快照（曾见停在 11-02）。腾讯日线不带成交额但日期/收盘可靠，
+    用于修复「图内时间停在旧快照」的问题。仅支持沪深指数 secid（1./0. 前缀）。"""
+    m = re.match(r"^([01])\.(\d{6})$", secid)
+    if not m:
+        return []
+    symbol = ("sh" if m.group(1) == "1" else "sz") + m.group(2)
+    url = ("https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+           f"?param={symbol},day,,,{limit},qfq")
+    d = get_json(url, tries=3)
+    node = (d.get("data") or {}).get(symbol) or {}
+    kl = node.get("qfqday") or node.get("day") or []
+    rows = []
+    for r in kl:
+        if not isinstance(r, list) or len(r) < 3:
+            continue
+        rows.append({"date": str(r[0]), "close": num(r[2]),
+                     "volume": num(r[5]) if len(r) > 5 else None,
+                     "amount": None})
+    return rows
+
+
 def fetch_kline(secid, limit=45):
     url = ("https://push2his.eastmoney.com/api/qt/stock/kline/get"
            f"?secid={secid}&klt=101&fqt=1&beg=20200101&end=20500101"
            f"&lmt={limit}&fields1=f1,f2,f3&fields2=f51,f53,f56,f57")
-    d = get_json(url)
+    try:
+        d = get_json(url)
+    except Exception:  # noqa: BLE001 - 东财被封/断连时切腾讯，别让上层整个回退旧快照
+        return fetch_kline_tencent(secid, limit)
     data = d.get("data") or {}
     rows = []
     for line in data.get("klines") or []:
@@ -173,6 +199,8 @@ def fetch_kline(secid, limit=45):
             continue
         rows.append({"date": p[0], "close": num(p[1]), "volume": num(p[2]),
                      "amount": num(p[3])})
+    if not rows:
+        return fetch_kline_tencent(secid, limit)
     return rows
 
 
@@ -195,8 +223,44 @@ def fetch_index_history():
     sz = {r["date"]: r for r in res.get("0.399001", [])}
     amt_hist = []
     for date in sorted(set(sh) & set(sz)):
-        amt_hist.append({"date": date, "amount": (sh[date]["amount"] or 0) + (sz[date]["amount"] or 0)})
+        a = (sh[date]["amount"] or 0) + (sz[date]["amount"] or 0)
+        # 腾讯日线不带成交额 → amount 为 None，此时不写 0（0 会污染柱状图/「今日成交」）
+        amt_hist.append({"date": date, "amount": a if a > 0 else None})
     return sparks, dates, amt_hist[-45:]
+
+
+def fetch_amount_tencent():
+    """腾讯 qt 实时沪深成交额（元）。东财 kline 被封后日线不带成交额，
+    成交额柱状图/今日成交会整体回退到旧快照（曾见停在 11-02）。
+    返回 {"today": 元, "trade_date": "YYYY-MM-DD"}；失败返回 None。"""
+    url = "https://qt.gtimg.cn/q=sh000001,sz399001"
+    try:
+        r = session.get(url, timeout=12)
+        r.raise_for_status()
+        raw = r.content.decode("gbk", "replace")
+    except Exception:  # noqa: BLE001
+        return None
+    total = 0.0
+    trade_date = None
+    for line in raw.split(";"):
+        if "~" not in line:
+            continue
+        body = line.split('"', 1)[-1].rstrip('"')
+        f = body.split("~")
+        if len(f) < 36:
+            continue
+        # [30] 时间戳 YYYYMMDDHHMMSS；[35] "价/量/额(元)"
+        ts = f[30] if len(f) > 30 else ""
+        if len(ts) >= 8 and ts[:8].isdigit():
+            trade_date = f"{ts[:4]}-{ts[4:6]}-{ts[6:8]}"
+        try:
+            amt = float(f[35].split("/")[2])
+        except (IndexError, ValueError):
+            amt = 0.0
+        total += amt
+    if total <= 0:
+        return None
+    return {"today": total, "trade_date": trade_date}
 
 
 def fetch_boards():
@@ -1044,6 +1108,19 @@ def main():
     if not amt_hist and breadth:
         amt_hist = [{"date": a["date"], "amount": a["amount"]}
                     for a in ((fb.get("amount") or {}).get("history") or [])]
+
+    # 东财 kline 被封后 amt_hist 的 amount 全为 None（腾讯日线不带成交额）：
+    # 用腾讯 qt 实时成交额补当日，并合并 fb 历史（去重按日期，当日优先腾讯），
+    # 让成交额柱状图/「今日成交」不停在旧快照日期。
+    amt_tx = safe("amount_tencent", fetch_amount_tencent)
+    if amt_tx and amt_tx.get("today"):
+        d_today = amt_tx.get("trade_date") or now.strftime("%Y-%m-%d")
+        merged = {a["date"]: a["amount"] for a in amt_hist if a.get("amount")}
+        for a in ((fb.get("amount") or {}).get("history") or []):
+            if a.get("date") and a.get("amount"):
+                merged.setdefault(a["date"], a["amount"])
+        merged[d_today] = amt_tx["today"]
+        amt_hist = [{"date": k, "amount": v} for k, v in sorted(merged.items())]
 
     # 成交额：今日（沪+深 K 线）与上一交易日
     today_amt = None
