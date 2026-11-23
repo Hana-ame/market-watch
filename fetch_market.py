@@ -1002,8 +1002,11 @@ def main():
     # 历史累积（按交易日）
     hist_path = HISTORY_PATH
     history = load_json(hist_path, [])
-    # 只在「已收盘 + 数据全绿」时记入历史（盘前/盘中/降级不写，避免 fallback 残值污染历史走势）
-    if breadth and score is not None and state == "已收盘" and not degraded:
+    # 只在「已收盘 + breadth 有真实涨跌家数」时记入历史。
+    # 放宽了原「整体不降级」条件：收盘后即使 news/boards 等偶发降级，只要当日涨跌家数真实
+    #（up+down>0），仍记入，避免漏记整天。盘前/盘中（state≠已收盘）与 breadth 假 0 不写，
+    # 防止 fallback 残值污染历史走势。
+    if breadth and state == "已收盘" and (breadth.get("up", 0) + breadth.get("down", 0)) > 0:
         entry = {
             "date": trade_date,
             "up": breadth["up"], "down": breadth["down"], "flat": breadth["flat"],
