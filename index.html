@@ -1520,6 +1520,20 @@
   };
   // 时间档 -> 取最近多少个交易日
   var PRICE_SLICE = {"1W":5, "1M":21, "3M":63, "1Y":250, "10Y":2500};
+  // localStorage 持久化：刷新后保留用户上次选的品种/时间档（mw_ 前缀避免冲突）
+  try {
+    var _ps = localStorage.getItem("mw_priceSym");
+    var _pr = localStorage.getItem("mw_priceRange");
+    if(_ps && PRICE_META[_ps]) priceSym = _ps;
+    if(_pr && PRICE_SLICE[_pr]) priceRange = _pr;
+    // 同步控件显示：下拉框选回恢复的品种、时间档按钮高亮恢复的档
+    var _sel = document.getElementById("pcSym");
+    if(_sel) _sel.value = priceSym;
+    var _pcr = document.getElementById("pcRange");
+    if(_pcr) _pcr.querySelectorAll(".chart-tab").forEach(function(b){
+      b.classList.toggle("on", b.dataset.r === priceRange);
+    });
+  } catch(e) {}
 
   function renderPriceChart(){
     if(typeof Chart === "undefined") return;   // CDN 未加载则跳过
@@ -1746,13 +1760,18 @@
   document.querySelectorAll("#pcRange .chart-tab").forEach(function(b){
     b.addEventListener("click", function(){
       priceRange = b.dataset.r;
+      try{ localStorage.setItem("mw_priceRange", priceRange); }catch(e){}
       document.querySelectorAll("#pcRange .chart-tab").forEach(function(x){ x.classList.toggle("on", x === b); });
       renderPriceChart();
     });
   });
   var pcSymEl = document.getElementById("pcSym");
   if(pcSymEl){
-    pcSymEl.addEventListener("change", function(){ priceSym = pcSymEl.value; renderPriceChart(); });
+    pcSymEl.addEventListener("change", function(){
+      priceSym = pcSymEl.value;
+      try{ localStorage.setItem("mw_priceSym", priceSym); }catch(e){}
+      renderPriceChart();
+    });
   }
 
   /* ---------------- interactions ---------------- */
