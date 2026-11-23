@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fetch_earnings.py — 财报数据确定性抓取，供 Pi Agent 分析。
+fetch_earnings.py — 财报数据确定性抓取，供 build_earnings.py 渲染。
 ================================================================
 输出 data/earnings_raw.json（结构化，含三市场数据 + 免责声明 + 抓取时间），
-供 prompt.md 里的 Pi Agent 读取并生成 dist/earnings/index.html。
+由 build_earnings.py 读入并确定性渲染 dist/earnings/index.html（不使用 LLM）。
 
 数据源（均公开、已验证可达，2026-11-23）：
   - 美股 SEC EDGAR  XBRL companyfacts（https://data.sec.gov/api/xbrl/companyfacts/CIK######.json）
@@ -35,7 +35,10 @@ EM_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 
 # 默认跟踪的标的（可被 --max / 参数覆盖；A股/港股取业绩报表靠前样本，美股用固定龙头）
 US_TICKERS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META"]
-CN_QUERY = {"pageSize": 6, "pageNumber": 1, "sortColumns": "UPDATE_DATE", "sortTypes": -1}
+CN_QUERY = {"pageSize": 300, "pageNumber": 1,
+            "sortColumns": "TOTAL_OPERATE_INCOME", "sortTypes": -1}
+# A股样本：营收降序取龙头并去重（中石化/中石油等多次上榜只留一条）。
+# 这些是营收规模最大的 A股公司，作为财报页代表样本。
 HK_SECU = ["00700.HK", "09988.HK", "03690.HK"]  # 腾讯 / 阿里 / 美团
 
 # us-gaap 指标别名（按优先级 fallback），key -> (标签, 含义)
@@ -118,6 +121,58 @@ def _gaap_pick(facts, aliases):
     return None
 
 
+def _metrics_for_end(facts, ref_end):
+    """给定基准财报期 ref_end，取该期（或与之最接近的期）的各指标，保证同一期口径。
+    修复：原逻辑每指标独立取最新，会把 2022 年营收和 2026 年净利拼在一起，
+    出现「净利润 > 营收」的荒谬组合。"""
+    gaap = facts.get("facts", {}).get("us-gaap", {})
+    metrics = {}
+    for label, aliases in GAAP_ALIASES.items():
+        # 找到该 label 下所有可用的 (end, val, unit)，按别名优先级 + end 距离 ref_end 选
+        best = None
+        for key in aliases:
+            if key not in gaap:
+                continue
+            units = gaap[key].get("units", {})
+            for unit, arr in units.items():
+                for item in arr:
+                    end = item.get("end", "")
+                    val = item.get("val")
+                    if val is None or not end:
+                        continue
+                    # 距离 ref_end 的天数差（字符串比较近似，够用）
+                    dist = abs((end[:10] > ref_end[:10]) - (end[:10] < ref_end[:10]))
+                    try:
+                        ddays = abs((__import__("datetime").date.fromisoformat(end[:10])
+                                     - __import__("datetime").date.fromisoformat(ref_end[:10])).days)
+                    except Exception:  # noqa: BLE001
+                        ddays = 9999
+                    # 优先同名指标内 end 最新，再跨别名按 end 距离
+                    cand = (ddays, end, val, unit)
+                    if best is None or (cand[0], cand[1]) < (best[0], best[1]):
+                        best = cand
+        if best and best[2] is not None:
+            metrics[label] = {"value": best[2], "unit": best[3], "end": best[1]}
+    return metrics
+
+
+def _latest_end(facts, aliases=("RevenueFromContractWithCustomerExcludingAssessedTax",
+                                "Revenues", "SalesRevenueNet",
+                                "RevenueFromContractWithCustomerIncludingAssessedTax")):
+    """取营收类指标最近的 end 作为整期基准（营收是财报核心口径）。"""
+    gaap = facts.get("facts", {}).get("us-gaap", {})
+    best = None
+    for key in aliases:
+        if key not in gaap:
+            continue
+        for unit, arr in gaap[key].get("units", {}).items():
+            for item in arr:
+                end = item.get("end", "")
+                if end and (best is None or end > best):
+                    best = end
+    return best
+
+
 def fetch_sec(ticks):
     cmap = _cik_map()
     out = []
@@ -133,12 +188,14 @@ def fetch_sec(ticks):
         try:
             d = get_json(sec_s, f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json")
             rec["entityName"] = d.get("entityName")
-            rec["metrics"] = {}
-            for label, aliases in GAAP_ALIASES.items():
-                picked = _gaap_pick(d, aliases)
-                if picked:
-                    unit, val, end = picked
-                    rec["metrics"][label] = {"value": val, "unit": unit, "end": end}
+            # 以营收最近期为基准，所有指标对齐到同一报告期（修复错期拼接）
+            ref_end = _latest_end(d)
+            if not ref_end:
+                rec["error"] = "no us-gaap metrics"
+                out.append(rec)
+                continue
+            rec["metrics"] = _metrics_for_end(d, ref_end)
+            rec["report_end"] = ref_end
             rec["ok"] = bool(rec["metrics"])
             if not rec["metrics"]:
                 rec["error"] = "no us-gaap metrics"
@@ -157,13 +214,17 @@ def fetch_cn():
            f"&sortColumns={CN_QUERY['sortColumns']}&sortTypes={CN_QUERY['sortTypes']}")
     d = get_json(em_s, url)
     rows = (d.get("result") or {}).get("data") or []
-    out = []
+    out, seen = [], set()
     for r in rows:
+        code = r.get("SECURITY_CODE")
+        if code in seen:        # 去重（中石化/中石油等多次上榜只留一条）
+            continue
+        seen.add(code)
         out.append({
-            "code": r.get("SECURITY_CODE"),
+            "code": code,
             "name": r.get("SECURITY_NAME_ABBR"),
             "market": r.get("TRADE_MARKET"),
-            "report_date": r.get("REPORTDATE"),
+            "report_date": (r.get("REPORTDATE") or "")[:10],
             "update_date": r.get("UPDATE_DATE"),
             "metrics": {
                 "revenue": {"value": num(r.get("TOTAL_OPERATE_INCOME")), "unit": "CNY"},
@@ -176,6 +237,8 @@ def fetch_cn():
             "source": "东方财富 RPT_LICO_FN_CPD",
             "ok": True,
         })
+        if len(out) >= 6:
+            break
     return out
 
 

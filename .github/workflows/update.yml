@@ -63,32 +63,11 @@ jobs:
       - name: Fetch earnings data (SEC EDGAR + 东方财富 A股/港股)
         run: python fetch_earnings.py || echo "[warn] fetch_earnings 失败，沿用旧 earnings_raw.json"
 
-      - name: Run Pi Agent earnings analysis
-        # 6 分钟：pi 正常 15s 完成；若 CI 启动网络卡死，快速失败走兜底页，不拖垮整个 build
-        timeout-minutes: 6
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          mkdir -p dist/earnings
-          # 注入 GEMINI key；若 Secrets 未配置则跳过（不阻断整站发布）
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "[warn] GEMINI_API_KEY 未配置，跳过财报分析（Secrets 需设置）"
-            exit 0
-          fi
-          # gemini-3.1-flash-lite：Free Tier 独立配额桶（gemini-3-flash 20 次/天易撞 429，-preview 会被归一化）
-          # --offline：禁用启动网络检查（CI 里 pi 会卡在模型目录/更新检查而挂起，本地 15s 完成）
-          # --no-session：不存会话，规避 CI 无 TTY 的交互挂起
-          # 重试 2 次；全失败则沿用旧产物（dist/ 在 gitignore 中，首次部署需成功一次）
-          for i in 1 2 3; do
-            echo "=== pi attempt $i ==="
-            if pi --provider google --model "gemini-3.1-flash-lite" --offline --no-session -p "$(cat prompt.md)"; then
-              echo "[ok] pi 分析成功：dist/earnings/index.html"
-              break
-            fi
-            echo "[warn] pi 第 $i 次失败（可能 429 限流/启动挂起），重试..."
-            sleep 10
-          done
-          [ -f dist/earnings/index.html ] || echo "[warn] dist/earnings/index.html 缺失，/earnings/ 将 404"
+      - name: Render earnings page (deterministic, no LLM)
+        # 不再用 Pi Agent/Gemini 生成：实测 LLM 会编造点评——把真实数字丢掉、
+        # 写成「现金流极其强劲」等无根据套话，甚至对缺数据的公司凭空点评。
+        # 改为确定性渲染：数字直接来自 earnings_raw.json，点评用规则从数字推导。
+        run: python build_earnings.py || echo "[warn] build_earnings 失败，沿用旧 earnings 页"
 
       - name: Fetch market data
         run: |
