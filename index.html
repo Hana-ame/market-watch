@@ -737,12 +737,14 @@
       {name:"黄金 XAU",   color:"#f0b429", vals:h.xau},
       {name:"沪金 AU0",   color:"#ffdf8a", vals:h.au0, dash:"4 3"},
       {name:"WTI 原油",   color:"#ff6b4a", vals:h.wti},
-      {name:"美元/日元",  color:"#4c8dff", vals:h.usdjpy},
+      // USDJPY 30日波动极小（常 <1%），归一化后近乎水平线，易被金/油大波动线视觉淹没；
+      // 加白色光晕(halo)并最后绘制，保证这条「基准=100 附近的水平线」一眼可辨
+      {name:"美元/日元",  color:"#4c8dff", vals:h.usdjpy, halo:true},
       {name:"离岸人民币", color:"#0ecb81", vals:h.usdcnh},
     ];
     return defs.filter(function(d){ return d.vals && d.vals.length > 1; }).map(function(d){
       var base = d.vals[0] || 1;
-      return {name:d.name, color:d.color, dash:d.dash, norm:d.vals.map(function(v){ return v / base * 100; })};
+      return {name:d.name, color:d.color, dash:d.dash, halo:d.halo, norm:d.vals.map(function(v){ return v / base * 100; })};
     });
   }
 
@@ -769,12 +771,18 @@
     var baseY = y(100).toFixed(1);
     grid += '<line x1="' + L + '" y1="' + baseY + '" x2="' + (W - R) + '" y2="' + baseY + '" stroke="#2a3a4d" stroke-width="1" stroke-dasharray="3 4"/>';
 
-    var paths = sets.map(function(s){
+    // halo 系列最后绘制（USDJPY 近水平线易被遮住，置顶层保证可见）
+    var ordered = sets.slice().sort(function(a,b){ return (a.halo?1:0) - (b.halo?1:0); });
+    var paths = ordered.map(function(s){
       var d = s.norm.map(function(v, i){ return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); }).join(" ");
-      return '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="1.8"'
+      var glow = s.halo
+        ? '<path d="' + d + '" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-opacity=".28" stroke-linejoin="round" stroke-linecap="round"/>'
+        : "";
+      return glow
+        + '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.halo ? 2.4 : 1.8) + '"'
         + (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '')
         + ' stroke-linejoin="round" stroke-linecap="round" opacity=".95"/>'
-        + '<circle cx="' + x(s.norm.length - 1).toFixed(1) + '" cy="' + y(s.norm[s.norm.length - 1]).toFixed(1) + '" r="2.6" fill="' + s.color + '"/>';
+        + '<circle cx="' + x(s.norm.length - 1).toFixed(1) + '" cy="' + y(s.norm[s.norm.length - 1]).toFixed(1) + '" r="' + (s.halo ? 3.2 : 2.6) + '" fill="' + s.color + '" stroke="#0b1017" stroke-width="1"/>';
     }).join("");
 
     $("macroChart").innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' + grid + paths + '</svg>';
