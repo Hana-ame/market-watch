@@ -546,7 +546,7 @@
     <div>
       数据来源：新浪财经（伦敦金/银、WTI、布伦特、沪金/上海原油、LME 基本金属、COMEX 铜、人民币与日元汇率）· 东方财富（国内期货主连日线、A股、指数、快讯、美元指数、离岸人民币）。<br>
       人民币折算：黄金 = XAU × USDCNY ÷ 31.1035（元/克）；原油 = 报价 × USDCNY（元/桶）；日元 = USDCNY ÷ USDJPY × 100（元/百日元）。<br>
-      自动刷新：数据由 GitHub Actions 每日 3 次抓取并部署到 GitHub Pages（北京 08:17 / 12:17 / 20:17）；本页每 5 分钟轮询一次 data.js 检测更新，发现新数据自动重渲染。仅供参考，不构成投资建议。
+      自动刷新：数据由 GitHub Actions 每 6 小时窗口抓取并部署到 GitHub Pages（北京 09:17 / 17:17 / 次日 01:17）；本页每 5 分钟轮询一次 data.js 检测更新，发现新数据自动重渲染。仅供参考，不构成投资建议。
     </div>
     <div class="r"><span id="footState">—</span><br><span class="num" id="footTs">—</span></div>
   </footer>
@@ -573,7 +573,7 @@
   var MKT = window.MKT;
   var $ = function(id){ return document.getElementById(id); };
   var uid = 0;
-  // data.js 由 CI 每日 3 次更新（北京 08:17/12:17/20:17），60s 轮询 99.8% 拉到同一文件；
+  // data.js 由 CI 每 6 小时窗口更新（北京 09:17/17:17/次日 01:17），60s 轮询 99.8% 拉到同一文件；
   // 改 5 分钟轮询，请求量降 5 倍，仍能及时捕捉更新（最长延迟 5 分钟）
   var REFRESH_MS = 300000;
 
