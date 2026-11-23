@@ -823,7 +823,9 @@
     }
     var h = {};
     ["xau","au0","wti","usdjpy","usdcnh"].forEach(function(k){
-      h[k] = cut(c3[k]) || (MKT.macro && MKT.macro.hist && MKT.macro.hist[k]) || [];
+      var s = c3[k];
+      var vals = (s && s.c) ? s.c : (Array.isArray(s) ? s : null);   // 新结构 {d,c}，旧为数组
+      h[k] = cut(vals) || (MKT.macro && MKT.macro.hist && MKT.macro.hist[k]) || [];
     });
     var defs = [
       {name:"黄金 XAU",   color:"#f0b429", vals:h.xau},
@@ -1496,8 +1498,13 @@
     var c3 = (MKT.macro && MKT.macro.chart3) || {};
     var meta = PRICE_META[priceSym] || PRICE_META.xau;
     var take = PRICE_SLICE[priceRange] || 2500;
-    var raw = c3[priceSym] || [];
-    var vals = raw.length > take ? raw.slice(-take) : raw;
+    var raw = c3[priceSym] || {};
+    // 新结构 {d:[日期], c:[收盘]}；兼容旧数组
+    var allDates = raw.d || [];
+    var allC = raw.c || (Array.isArray(raw) ? raw : []);
+    var start = Math.max(0, allC.length - take);
+    var dates = allDates.slice(start);
+    var vals = allC.slice(start);
     var canvas = document.getElementById("priceChart");
     if(!canvas) return;
 
@@ -1510,7 +1517,7 @@
 
     var ctx = canvas.getContext("2d");
     var data = {
-      labels: vals.map(function(_, i){ return i; }),   // 占位，实际用 x 轴隐藏刻度
+      labels: dates,   // 真实日期，Tooltip 显示「日期 价格」
       datasets: [{
         label: meta.name, data: vals,
         borderColor: meta.color, backgroundColor: meta.color,
@@ -1523,11 +1530,17 @@
       plugins: {
         legend: {display:false},
         tooltip: {
-          callbacks: { label: function(c){ return meta.name + ": " + c.parsed.y.toFixed(meta.dp) + " " + meta.unit; } }
+          callbacks: {
+            title: function(items){ var i=items[0].dataIndex; return dates[i] || ""; },
+            label: function(c){ return c.parsed.y.toFixed(meta.dp) + " " + meta.unit; }
+          }
         }
       },
       scales: {
-        x: {display:true, ticks:{display:false}, grid:{display:false}},
+        x: {display:true, ticks:{display:true, maxTicksLimit:8, color:"#8496ab",
+              font:{family:"monospace", size:10},
+              callback:function(v){ return (dates[v] || "").slice(2); }},
+            grid:{display:false}},
         y: {display:true, position:"right",
             ticks:{color:"#8496ab", font:{family:"monospace", size:11},
                    callback:function(v){ return v.toFixed(meta.dp); }},

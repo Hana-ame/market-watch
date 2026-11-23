@@ -835,22 +835,24 @@ def fetch_macro():
     w = {}
     for sym, skey in (("XAU", "xau"), ("XAG", "xag"), ("CL", "wti"), ("OIL", "brent")):
         try:
-            w[skey] = [r["close"] for r in fetch_sina_hist_global(sym, CHART_MAX_DAYS)
-                       if r.get("close")]
+            rows = fetch_sina_hist_global(sym, CHART_MAX_DAYS)
+            w[skey] = {"d": [r["date"] for r in rows if r.get("close")],
+                       "c": [r["close"] for r in rows if r.get("close")]}
         except Exception:  # noqa: BLE001
-            w[skey] = []
+            w[skey] = {"d": [], "c": []}
     for cur, skey in (("JPY", "usdjpy"), ("CNY", "usdcnh")):
         try:
-            w[skey] = [r["close"] for r in fetch_fx_hist_frankfurter(cur, CHART_MAX_DAYS)
-                       if r.get("close")]
+            rows = fetch_fx_hist_frankfurter(cur, CHART_MAX_DAYS)
+            w[skey] = {"d": [r["date"] for r in rows if r.get("close")],
+                       "c": [r["close"] for r in rows if r.get("close")]}
         except Exception:  # noqa: BLE001
-            w[skey] = []
-    # 沪金合成：XAU × USDCNY ÷ 31.1035。Sina 两序列同源同交易日，逐位对齐；
-    # 取末尾 min(len) 段保证各线等长（归一化对比可接受范围）。
-    xau_l, cny_l = w.get("xau", []), w.get("usdcnh", [])
-    n_pair = min(len(xau_l), len(cny_l))
-    w["au0"] = ([round(xau_l[-n_pair + i] * cny_l[-n_pair + i] / OZ_TO_GRAM, 2)
-                 for i in range(n_pair)] if n_pair >= 2 else [])
+            w[skey] = {"d": [], "c": []}
+    # 沪金合成：XAU × USDCNY ÷ 31.1035，按日期交集对齐（Sina 与 Frankfurter 交易日不同）。
+    xau_m = {r["date"]: r["close"] for r in fetch_sina_hist_global("XAU", CHART_MAX_DAYS)}
+    cny_m = {r["date"]: r["close"] for r in fetch_fx_hist_frankfurter("CNY", CHART_MAX_DAYS)}
+    common = sorted(set(xau_m) & set(cny_m))
+    w["au0"] = {"d": common,
+                "c": [round(xau_m[dt_] * cny_m[dt_] / OZ_TO_GRAM, 2) for dt_ in common]}
     chart3 = w
 
     # CNY 折算
