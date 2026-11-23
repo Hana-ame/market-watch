@@ -1288,6 +1288,15 @@ def main():
             sparks[secid] = fsparks[secid]
     if not sparks:
         sparks = fsparks
+    # idx_hist 回退：价格走势图的指数长序列抓取失败时（东财封+腾讯偶发失败），
+    # 用 fallback.sparks（30 点迷你数据）兜底，保证切到指数至少有图可看，
+    # 而非显示「—」空白。sparks 是纯 close 数组 → 转成 {d,c} 结构（日期未知用序号占位）。
+    if isinstance(idx_hist, dict):
+        for secid in list(idx_hist.keys()):
+            h = idx_hist.get(secid) or {}
+            if not h.get("c") and fsparks.get(secid):
+                sp = fsparks[secid]
+                idx_hist[secid] = {"d": [str(i) for i in range(len(sp))], "c": list(sp)}
     if not amt_hist:
         amt_hist = [{"date": a["date"], "amount": a["amount"]}
                     for a in ((fb.get("amount") or {}).get("history") or [])]
