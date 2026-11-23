@@ -354,11 +354,12 @@ def fetch_kline(secid, limit=45):
 
 
 def fetch_index_history():
-    """指数 30 日收盘（迷你走势）+ 沪深两市近 45 日成交额"""
+    """指数收盘（迷你走势用末 30 点；价格走势图十年档需 500 点）+ 沪深两市近 45 日成交额"""
     def one(item):
         secid = item[0]
         try:
-            rows = fetch_kline(secid)
+            # 取 500 根（约 2 年）供价格走势图十年档；东财被封时走腾讯兜底
+            rows = fetch_kline(secid, 500)
             # 东财对境外 runner 偶发返回空 klines（HTTP 200 但 data.klines=[]）
             # 单 secid 失败不抛：上层逐序列回退 fallback.sparks，避免拖垮整个指数块
             return secid, rows or []
@@ -366,7 +367,12 @@ def fetch_index_history():
             return secid, []
     with ThreadPoolExecutor(8) as ex:
         res = dict(ex.map(one, INDICES))
+    # 归一化图需要十年/一年档 → 保留长序列（腾讯日线可取 500 根约 2 年；
+    # 东财被封时走腾讯兜底 fetch_kline）。sparks 迷你图只用末 30 点。
     sparks = {secid: [r["close"] for r in rows[-30:]] for secid, rows in res.items()}
+    idx_hist = {secid: {"d": [r["date"] for r in rows if r.get("close")],
+                        "c": [r["close"] for r in rows if r.get("close")]}
+                for secid, rows in res.items()}
     dates = [r["date"] for r in res.get("1.000001", [])][-30:]
     sh = {r["date"]: r for r in res.get("1.000001", [])}
     sz = {r["date"]: r for r in res.get("0.399001", [])}
@@ -375,7 +381,7 @@ def fetch_index_history():
         a = (sh[date]["amount"] or 0) + (sz[date]["amount"] or 0)
         # 腾讯日线不带成交额 → amount 为 None，此时不写 0（0 会污染柱状图/「今日成交」）
         amt_hist.append({"date": date, "amount": a if a > 0 else None})
-    return sparks, dates, amt_hist[-45:]
+    return sparks, dates, amt_hist[-45:], idx_hist
 
 
 def fetch_amount_tencent():
@@ -1235,7 +1241,7 @@ def main():
                 if it.get("code") and it.get("code") not in have:
                     indices.append(it)
                     have.add(it["code"])
-    sparks, spark_dates, amt_hist = safe("kline", fetch_index_history, ({}, [], []))
+    sparks, spark_dates, amt_hist, idx_hist = safe("kline", fetch_index_history, ({}, [], [], {}))
     boards = safe("boards", fetch_boards, {})
     if not boards:
         boards = fb.get("boards") or {}
@@ -1299,6 +1305,11 @@ def main():
         state = "休市（今日不开市）"
 
     macro = safe("macro", fetch_macro)
+    # 把 A股指数长历史并入 chart3，供价格走势图切换查看（secid 作 key）
+    if isinstance(macro, dict):
+        c3 = macro.get("chart3")
+        if isinstance(c3, dict):
+            c3.update(idx_hist or {})
     pools = safe("limit_pools", lambda: fetch_limit_pools(trade_date), {}) or {}
     if (not pools) or (pools.get("limit_up", {}).get("count") is None
                        and pools.get("limit_down", {}).get("count") is None

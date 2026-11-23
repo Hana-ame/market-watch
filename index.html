@@ -392,12 +392,21 @@
       <div class="panel-t">价格走势</div>
       <div class="panel-sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select id="pcSym" class="pc-sel">
+          <optgroup label="商品 · 外汇">
           <option value="xau">黄金 XAU/USD</option>
           <option value="xag">白银 XAG/USD</option>
           <option value="wti">WTI 原油</option>
           <option value="brent">布伦特原油</option>
           <option value="usdjpy">美元/日元</option>
           <option value="usdcnh">离岸人民币</option>
+          </optgroup>
+          <optgroup label="A股指数">
+          <option value="1.000001">上证指数</option>
+          <option value="0.399001">深证成指</option>
+          <option value="0.399006">创业板指</option>
+          <option value="1.000688">科创50</option>
+          <option value="1.000300">沪深300</option>
+          </optgroup>
         </select>
         <span class="chart-tabs" id="pcRange">
           <button class="chart-tab" data-r="1W">一周</button>
@@ -1489,7 +1498,13 @@
     wti:    {name:"WTI 原油",       color:"#ff6b4a", unit:"美元/桶",   dp:2},
     brent:  {name:"布伦特原油",     color:"#e0603a", unit:"美元/桶",   dp:2},
     usdjpy: {name:"美元/日元",      color:"#4c8dff", unit:"日元/美元", dp:2},
-    usdcnh: {name:"离岸人民币",     color:"#0ecb81", unit:"USD/CNH",   dp:4}
+    usdcnh: {name:"离岸人民币",     color:"#0ecb81", unit:"USD/CNH",   dp:4},
+    // A股指数（腾讯日线兜底，secid 作 chart3 key）
+    "1.000001": {name:"上证指数",   color:"#ff4d5e", unit:"点", dp:2},
+    "0.399001": {name:"深证成指",   color:"#ff9f43", unit:"点", dp:2},
+    "0.399006": {name:"创业板指",   color:"#a29bfe", unit:"点", dp:2},
+    "1.000688": {name:"科创50",     color:"#00c2a8", unit:"点", dp:2},
+    "1.000300": {name:"沪深300",    color:"#5b8def", unit:"点", dp:2}
   };
   // 时间档 -> 取最近多少个交易日
   var PRICE_SLICE = {"1W":5, "1M":21, "3M":63, "1Y":250, "10Y":2500};
