@@ -990,7 +990,13 @@
     (MKT.indices || []).forEach(function(it){
       var c = cls(it.pct);
       var color = it.pct > 0.0001 ? "#ff4d5e" : it.pct < -0.0001 ? "#0ecb81" : "#8b9bb0";
-      var sp = (MKT.sparks && MKT.sparks[it.code]) || [];
+      // sparks 以 secid 为 key（1.000001/0.399001），indices[].code 无前缀（000001）——
+      // 用后缀匹配查找，避免 key 不匹配导致迷你走势图缺失
+      var sp = [];
+      if(MKT.sparks){
+        var sk = Object.keys(MKT.sparks).filter(function(k){ return k.slice(-6) === it.code; })[0];
+        if(sk) sp = MKT.sparks[sk] || [];
+      }
       var d = document.createElement("div");
       d.className = "idx-card";
       d.innerHTML = '<div class="idx-top"><span class="idx-name">' + esc(it.name) + '</span><span class="idx-amt">' + fmtAmt(it.amount) + '</span></div>'
