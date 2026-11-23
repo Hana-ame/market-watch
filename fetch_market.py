@@ -762,8 +762,7 @@ def fetch_metals(usdcny):
         groups.append({"name": "国际（折人民币）", "items": intl_rows})
 
     # 30 日历史（国内主连日线并发；国际用新浪全球期货日线）
-    price_by = {k: p for _, items in METALS for (k, n, c, em, u) in items
-                for p in [next((it["price"] for it in groups if it["key"] == k), None)]}
+    price_by = {it["key"]: it["price"] for it in flat}
     def job(k, em):
         try:
             rows = [r["close"] for r in fetch_em_fut_hist(em, today)]
