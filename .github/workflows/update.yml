@@ -60,7 +60,7 @@ jobs:
           node-version: "22"
 
       - name: Install Pi Agent
-        run: npm install -g @mariozechner/pi-coding-agent
+        run: npm install -g @earendil-works/pi-coding-agent
 
       - name: Fetch earnings data (SEC EDGAR + 东方财富 A股/港股)
         run: python fetch_earnings.py || echo "[warn] fetch_earnings 失败，沿用旧 earnings_raw.json"
