@@ -972,6 +972,20 @@ def main():
     if limit_down.get("count") is None:
         limit_down["count"] = prev.get("limit_down", {}).get("count")
 
+    # 个别指数（北证50）东财 ulist 实时 f2 偶发缺失（price=None，但 kline 有 close）。
+    # 用已有 sparks 最后 close 补 price / pct（纯本地逻辑，零额外请求）。
+    for it in indices:
+        if it.get("price") is not None:
+            continue
+        for secid, rows in sparks.items():
+            if secid.endswith(it["code"]) and rows:
+                it["price"] = rows[-1]
+                pc = it.get("prev_close")
+                if pc:
+                    it["pct"] = round((it["price"] / pc - 1) * 100, 2)
+                    it["change"] = round(it["price"] - pc, 2)
+                break
+
     if not breadth:
         breadth = prev.get("breadth") or fb.get("breadth")
     if not amt_hist and breadth:
