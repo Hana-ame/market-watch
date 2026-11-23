@@ -1699,15 +1699,27 @@
       }
     }
 
-    // 更新区间说明
-    var names = {"1W":"近一周","1M":"近一月","3M":"近三月","1Y":"近一年","10Y":"近十年"};
+    // 更新区间说明：按实际数据首末日期算真实跨度（指数腾讯源约 2 年，十年档实为
+    // 6-7 年，写死「近十年」会误导）。跨度 <1 年显示档名，≥1 年显示年数。
     var n = PRICE_SLICE[priceRange] || 2500;
+    var names = {"1W":"近一周","1M":"近一月","3M":"近三月","1Y":"近一年","10Y":"近十年"};
+    var spanTxt = "";
+    if(dates.length >= 2){
+      var d0 = dates[0], d1 = dates[dates.length-1];
+      // 估算自然年跨度（首尾日期差 / 365）
+      var y0 = parseInt(d0.slice(0,4)), y1 = parseInt(d1.slice(0,4));
+      var m0 = parseInt(d0.slice(5,7)), m1 = parseInt(d1.slice(5,7));
+      var yrs = (y1 - y0) + (m1 - m0)/12;
+      spanTxt = yrs >= 1 ? ("近 " + yrs.toFixed(1) + " 年") : (names[priceRange] || "");
+    } else {
+      spanTxt = names[priceRange] || "";
+    }
     // 数据源说明按品种区分（指数走腾讯日线，外汇走 ECB，商品走 Sina）
     var isIdx = ["1.000001","0.399001","0.399006","1.000688","1.000300"].indexOf(priceSym) >= 0;
     var src = isIdx ? "腾讯财经（A股指数日线，约 2 年）"
             : (priceSym === "usdjpy" || priceSym === "usdcnh"
                ? "Frankfurter（ECB，最长约 10 年）" : "Sina 全局期货日线");
-    $("pcNote").textContent = names[priceRange] + "（" + Math.min(n, vals.length) + " 个交易日）· "
+    $("pcNote").textContent = spanTxt + "（" + Math.min(n, vals.length) + " 个交易日）· "
       + "Y 轴为真实价格。数据源：" + src;
 
     // 周期涨跌摘要条：一次性算该品种各档涨跌幅（基于 chart3 长序列，不受当前窗口影响）
