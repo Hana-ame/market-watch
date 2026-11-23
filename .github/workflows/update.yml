@@ -86,19 +86,26 @@ jobs:
         run: |
           SHOULD=$(python3 - <<'PY'
           import json, subprocess
+          REASON = "unknown"
           try:
               latest = json.load(open("data/latest.json"))
               meta = latest.get("meta", {})
               hist = json.load(open("data/history.json"))
-          except Exception:
+          except Exception as e:
+              REASON = "read error: " + str(e)[:50]
               print(0); raise SystemExit
           # 与 fetch_market.py 的 history 写入条件对齐：只要已收盘 + breadth 有真实涨跌
           # 家数（up+down>0）就写，不要求整体无降级（boards/news 等偶发失败不影响历史）。
           # stale（breadth 用昨收快照）仍不写，防止污染走势。
           b = (hist[-1] if hist else {}) or {}
           if meta.get("state") != "已收盘":
+              REASON = "state=" + str(meta.get("state"))
               print(0); raise SystemExit
-          if b.get("stale") or (b.get("up", 0) + b.get("down", 0)) <= 0:
+          if b.get("stale"):
+              REASON = "breadth stale (昨收快照)"
+              print(0); raise SystemExit
+          if (b.get("up", 0) + b.get("down", 0)) <= 0:
+              REASON = "breadth up+down<=0"
               print(0); raise SystemExit
           today = hist[-1]["date"]
           try:
@@ -107,9 +114,17 @@ jobs:
               old = []
           import os
           fb_ok = os.path.exists("data/fallback.json") and os.path.getsize("data/fallback.json") > 200
-          print(0 if (today in {x.get("date") for x in old} and fb_ok) else 1)
+          if today in {x.get("date") for x in old}:
+              REASON = today + " 已记录（重复跳过）"
+              print(0); raise SystemExit
+          if not fb_ok:
+              REASON = "fallback.json 缺失/过小"
+              print(0); raise SystemExit
+          REASON = "OK: 写入 " + today
+          print(1)
           PY
           )
+          echo "[history-persist] SHOULD=$SHOULD ($REASON)"
           if [ "$SHOULD" = "1" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
