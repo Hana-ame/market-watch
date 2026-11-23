@@ -177,10 +177,141 @@ def fetch_kline_tencent(secid, limit=45):
     for r in kl:
         if not isinstance(r, list) or len(r) < 3:
             continue
-        rows.append({"date": str(r[0]), "close": num(r[2]),
+        rows.append({"date": str(r[0]),
+                     "open": num(r[1]), "close": num(r[2]),
+                     "high": num(r[3]) if len(r) > 3 else num(r[2]),
+                     "low": num(r[4]) if len(r) > 4 else num(r[2]),
                      "volume": num(r[5]) if len(r) > 5 else None,
                      "amount": None})
     return rows
+
+
+# A股指数（筹码分布不适用于指数：指数无换手/成本分布意义，此处仅个股）
+CHIP_FACTOR = 150       # 东财同款：价格区间切 150 格
+CHIP_RANGE = 120        # 回看最近 120 根 K 线
+
+
+def compute_chip_distribution(klines, floats=None):
+    """纯 Python 复刻东财 CYQCalculator（三角分布筹码模型）。
+    klines: [{date,open,high,low,close,volume}]（按日期升序）
+    floats: 流通股本（股）。换手率 = 成交量 / floats；缺省时按「每日成交 1/120 流通盘」近似。
+    返回最新一日的筹码分布指标 dict。"""
+    if not klines:
+        return None
+    recent = klines[-CHIP_RANGE:]
+    hi = max(r["high"] for r in recent)
+    lo = min(r["low"] for r in recent)
+    if hi <= lo:
+        return None
+    acc = max(0.01, (hi - lo) / (CHIP_FACTOR - 1))
+    yrange = [lo + acc * i for i in range(CHIP_FACTOR)]
+    x = [0.0] * CHIP_FACTOR
+    for r in recent:
+        o, c, h, l = r["open"], r["close"], r["high"], r["low"]
+        v = r["volume"]
+        if None in (o, c, h, l) or not v:
+            continue
+        avg = (o + c + h + l) / 4
+        if floats:
+            hsl = min(1.0, (v / floats))
+        else:
+            hsl = min(1.0, 1 / CHIP_RANGE)
+        H = int((h - lo) / acc)
+        L = int(round((l - lo) / acc))
+        g0 = (CHIP_FACTOR - 1) if h == l else 2 / (h - l)
+        for n in range(CHIP_FACTOR):
+            x[n] *= (1 - hsl)
+        if h == l:
+            g1 = int((avg - lo) / acc)
+            x[g1] += g0 * hsl / 2
+        else:
+            for j in range(max(0, L), min(CHIP_FACTOR - 1, H) + 1):
+                cur = lo + acc * j
+                if cur <= avg:
+                    x[j] += (1 if abs(avg - l) < 1e-9 else
+                             (cur - l) / (avg - l)) * g0 * hsl
+                else:
+                    x[j] += (1 if abs(h - avg) < 1e-9 else
+                             (h - cur) / (h - avg)) * g0 * hsl
+    total = sum(x)
+    if total <= 0:
+        return None
+
+    def cost_at(chip):
+        s = 0.0
+        for i, xv in enumerate(x):
+            s += xv
+            if s > chip:
+                return lo + i * acc
+        return lo
+
+    def pct_chips(pct):
+        ps = (1 - pct) / 2, (1 + pct) / 2
+        a, b = cost_at(total * ps[0]), cost_at(total * ps[1])
+        conc = 0 if (a + b) == 0 else (b - a) / (a + b)
+        return {"range": [round(a, 2), round(b, 2)], "concentration": round(conc * 100, 1)}
+
+    last = recent[-1]
+    cur = last["close"]
+    below = sum(x[: int((cur - lo) / acc) + 1])
+    # 降采样到 ~24 桶给前端画直方图（[价, 筹码占比%]），原始 150 桶太大
+    n_out = 24
+    step = CHIP_FACTOR / n_out
+    dist = []
+    for b in range(n_out):
+        i0, i1 = int(b * step), max(int(b * step) + 1, int((b + 1) * step))
+        chunk = x[i0:i1]
+        share = (sum(chunk) / total * 100) if total > 0 else 0
+        dist.append([round(yrange[i0], 2), round(share, 2)])
+    return {
+        "code": last["code"] if "code" in last else None,
+        "date": last["date"],
+        "price": cur,
+        "avg_cost": round(cost_at(total * 0.5), 2),
+        "profit_ratio": round(below / total * 100, 1),   # 获利比例 %
+        "pct90": pct_chips(0.9),
+        "pct70": pct_chips(0.7),
+        "dist": dist,
+    }
+
+
+def fetch_floats_tencent(symbol):
+    """腾讯 qt 取流通股本（股）。[44]流通市值(亿) / [3]现价 = 流通股本。"""
+    try:
+        r = session.get(f"https://qt.gtimg.cn/q={symbol}", timeout=12)
+        r.raise_for_status()
+        body = r.content.decode("gbk", "replace").split('"', 1)[-1].rstrip('"')
+        f = body.split("~")
+        if len(f) <= 44:
+            return None
+        price = num(f[3])
+        lcap = num(f[44])       # 流通市值（亿元）
+        if not price or not lcap:
+            return None
+        return lcap * 1e8 / price
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def fetch_chip(symbols):
+    """给若干 A股代码（'600519'=贵州茅台 形式）算筹码分布指标。"""
+    out = []
+    for code in symbols:
+        market = "1" if code.startswith("6") else "0"
+        secid = f"{market}.{code}"
+        symbol = ("sh" if market == "1" else "sz") + code
+        try:
+            kl = fetch_kline_tencent(secid, CHIP_RANGE)
+        except Exception:  # noqa: BLE001
+            kl = []
+        if not kl:
+            continue
+        floats = fetch_floats_tencent(symbol)
+        res = compute_chip_distribution(kl, floats)
+        if res:
+            res["code"] = code
+            out.append(res)
+    return out
 
 
 def fetch_kline(secid, limit=45):
@@ -1042,6 +1173,22 @@ def main():
         wl = fb.get("watchlist") or []
     news = safe("news", fetch_news, [])
 
+    # 筹码分布：给 A股自选股算（港股/美股腾讯接口无对应数据，故仅 A股）
+    a_codes = [code for mkt, items in WATCHLIST for _, code, _ in items
+               if mkt == "A"]
+    chip = safe("chip", lambda: fetch_chip(a_codes), [])
+    # 全部失败时用兜底快照（筹码按日变化，昨收数据仍可参考）
+    if not chip:
+        chip = (fb.get("chip") or prev.get("chip") or [])
+        if isinstance(chip, dict):
+            chip = []
+    if chip:
+        have = {c.get("code") for c in chip}
+        for src in ((prev.get("chip") or []) + (fb.get("chip") or [])):
+            if isinstance(src, dict) and src.get("code") and src["code"] not in have:
+                chip.append(src)
+                have.add(src["code"])
+
     if not indices:
         indices = prev.get("indices") or fb.get("indices") or []
     if not indices:
@@ -1187,6 +1334,7 @@ def main():
         "boards": boards,
         "watchlist": wl,
         "news": news,
+        "chip": chip,
         "amount": amount,
         "score": score,
         "history": history[-20:],
@@ -1198,7 +1346,7 @@ def main():
     if indices_fresh and breadth and (breadth.get("up", 0) + breadth.get("down", 0)) > 0:
         save_json(FALLBACK_PATH, {k: snap.get(k) for k in (
             "meta", "indices", "sparks", "breadth", "limit_up", "limit_down", "zhaban",
-            "boards", "watchlist", "amount", "score", "history")})
+            "boards", "watchlist", "chip", "amount", "score", "history")})
     snap["summary_ashare"] = build_summary(snap)
     snap["summary"] = build_macro_summary(macro) if macro else snap["summary_ashare"]
     snap["macro"]["state"] = macro_state(now)

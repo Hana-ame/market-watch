@@ -273,6 +273,24 @@
   .wl-row .wp{font-family:var(--mono);color:#e6eef7;text-align:right}
   .wl-row .wc{font-family:var(--mono);font-size:12px;text-align:right;font-weight:600}
   .wl-row .wa{grid-column:3;font-size:10px;color:var(--dim);font-family:var(--mono);text-align:right;margin-top:-3px}
+  /* 筹码分布（cyq 前缀，避开跌停/炸板 .chip） */
+  .cyqwrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .cyq{background:#0d141d;border:1px solid var(--line);border-radius:8px;padding:11px 13px 10px}
+  .cyq-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+  .cyq-h .cn{color:#c9d6e4;font-size:12.5px;white-space:nowrap}
+  .cyq-h .cm{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:right;line-height:1.5}
+  .cyq-h .cm b.profit{font-size:12.5px;font-weight:700}
+  .cyq-h .cm b.profit.up{color:#ff4d5e}
+  .cyq-h .cm b.profit.down{color:#0ecb81}
+  .cyq-h .cm b{color:#c9d6e4;font-weight:600}
+  .cyqbar{display:flex;align-items:flex-end;gap:1px;height:56px;margin:6px 0 6px;position:relative}
+  .cyqbar .bar{flex:1;background:#2f6fb3;border-radius:1px 1px 0 0;min-height:2px}
+  .cyqbar .bar.profit{background:#ff4d5e}
+  .cyqbar .costline{position:absolute;top:-3px;bottom:-3px;width:0;border-left:1px dashed #e6eef7;opacity:.7}
+  .cyqbar .priceline{position:absolute;top:-3px;bottom:-3px;width:0;border-left:2px solid #ffd166}
+  .cyq-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);flex-wrap:wrap;gap:4px;margin-top:2px}
+  .cyq-meta span b{color:#c9d6e4;font-weight:600}
+  @media (max-width:900px){ .cyqwrap{grid-template-columns:1fr} }
   .hbars{display:flex;align-items:flex-end;gap:2px;height:52px}
   .hbars .h{flex:1;background:linear-gradient(180deg,#2f4a66,#1b2c3d);border-radius:2px 2px 0 0;min-height:2px}
   .hbars .h.up{background:linear-gradient(180deg,#ff6b78,#c5303f)}
@@ -523,6 +541,11 @@
     <section class="panel">
       <div class="panel-h"><div class="panel-t">自选股</div><div class="panel-sub">A股 · CNY / 港股 · HKD / 美股 · USD</div></div>
       <div class="wl" id="wlBox"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-h"><div class="panel-t">筹码分布</div><div class="panel-sub" id="chipSub">A股自选股 · 获利比例 / 平均成本 / 筹码集中度</div></div>
+      <div class="cyqwrap" id="chipBox"></div>
     </section>
 
     <section class="panel">
@@ -1275,6 +1298,53 @@
     }
   }
 
+  function renderChip(){
+    var box = $("chipBox"); if(!box) return;
+    var list = MKT.chip || [];
+    if(!list.length){ box.innerHTML = '<div class="empty">筹码数据缺失</div>'; return; }
+    // code -> 名称：从 watchlist A 股组构建
+    var names = {};
+    (MKT.watchlist || []).forEach(function(g){
+      if(g.market !== "A") return;
+      g.items.forEach(function(it){ names[it.code] = it.name; });
+    });
+    $("chipSub").textContent = "A股自选股 · 获利比例 / 平均成本 / 筹码集中度";
+    box.innerHTML = "";
+    list.forEach(function(c){
+      var prof = c.profit_ratio;
+      var cls_ = prof >= 50 ? "up" : "down";
+      var d = document.createElement("div"); d.className = "cyq";
+
+      // 直方图：dist=[[价, 占比%]...]；柱高按占比，颜色按是否低于现价（获利区=红）
+      var peak = 0.01;
+      (c.dist||[]).forEach(function(b){ peak = Math.max(peak, b[1]); });
+      var lo = c.dist && c.dist.length ? c.dist[0][0] : 0;
+      var hi = c.dist && c.dist.length ? c.dist[c.dist.length-1][0] : 1;
+      var span = (hi - lo) || 1;
+      var bars = (c.dist||[]).map(function(b){
+        var h = Math.max(4, Math.round(b[1]/peak*100));
+        var isProfit = b[0] < c.price;   // 现价下方=获利盘（红，国内惯例）；上方=套牢盘（蓝）
+        return '<div class="bar' + (isProfit ? " profit" : "") + '" style="height:' + h + '%" title="' + b[0] + ' · 占比 ' + b[1] + '%"></div>';
+      }).join("");
+      var costPct = Math.max(0, Math.min(100, (c.avg_cost - lo)/span*100));
+      var pricePct = Math.max(0, Math.min(100, (c.price - lo)/span*100));
+
+      d.innerHTML =
+        '<div class="cyq-h"><span class="cn">' + esc(names[c.code] || c.code) + '</span>'
+        + '<span class="cm">获利 <b class="profit ' + cls_ + '">' + prof + '%</b>'
+        + ' · 均成本 <b>' + fmt(c.avg_cost) + '</b>'
+        + ' · 90%筹码 <b>' + c.pct90.range[0] + '–' + c.pct90.range[1] + '</b>'
+        + '（集中度 ' + c.pct90.concentration + '%）</span></div>'
+        + '<div class="cyqbar">' + bars
+        + '<div class="costline" style="left:' + costPct + '%"></div>'
+        + '<div class="priceline" style="left:' + pricePct + '%"></div></div>'
+        + '<div class="cyq-meta">'
+        + '<span>70%筹码 <b>' + c.pct70.range[0] + '–' + c.pct70.range[1] + '</b>（集中度 ' + c.pct70.concentration + '%）</span>'
+        + '<span>现价 <b>' + fmt(c.price) + '</b> · 数据 ' + (c.date||"").slice(5) + '</span></div>';
+      box.appendChild(d);
+    });
+  }
+
   function renderAll(){
     if(!window.MKT){ showFatal("data.js 已加载但没有 window.MKT（文件可能损坏）"); return; }
     MKT = window.MKT;
@@ -1283,7 +1353,7 @@
     if(macroReady()){ renderMacro(); renderMetals(); }
     renderNews();
     renderAIndices(); renderBreadth(); renderMood(); renderBoards();
-    renderLimits(); renderWatch(); renderHistory();
+    renderLimits(); renderWatch(); renderChip(); renderHistory();
   }
 
   /* ---------------- interactions ---------------- */
