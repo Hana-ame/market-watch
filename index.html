@@ -1576,9 +1576,16 @@
     // 现价（最新点）
     var last = vals.length ? vals[vals.length-1] : null;
     var nowEl = $("pcNow");
-    if(nowEl) nowEl.innerHTML = last != null
-      ? '<b>' + last.toFixed(meta.dp) + '</b> <small>' + meta.unit + '</small>'
-      : '—';
+    if(nowEl){
+      // 现价 + 当前档涨跌幅（首末对比）
+      var chg = (vals.length >= 2 && vals[0]) ? (last/vals[0] - 1) * 100 : null;
+      var chgHtml = chg !== null
+        ? ' <small class="' + (chg>0?"up":chg<0?"down":"") + '">' + (chg>0?"+":"") + chg.toFixed(2) + '%</small>'
+        : '';
+      nowEl.innerHTML = last != null
+        ? '<b>' + last.toFixed(meta.dp) + '</b> <small>' + meta.unit + '</small>' + chgHtml
+        : '—';
+    }
 
     var ctx = canvas.getContext("2d");
     // MA 线：仅在窗口足够长（≥60 交易日）时叠加，短线图（一周/一月）显示会显杂乱
