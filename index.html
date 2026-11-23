@@ -1681,9 +1681,11 @@
         rsiBlock.hidden = false;
         var rsiLast = rsiVals[rsiVals.length-1];
         var rsiCls = rsiLast >= 70 ? "overbought" : (rsiLast <= 30 ? "oversold" : "");
+        // 边界区提示：30-40 接近超卖、60-70 接近超买（比纯三态更细）
+        var rsiState = rsiLast >= 70 ? " 超买" : rsiLast >= 60 ? " 偏热" : rsiLast <= 30 ? " 超卖" : rsiLast <= 40 ? " 偏冷" : " 中性";
         var rsiValEl = document.getElementById("rsiVal");
         if(rsiValEl){
-          rsiValEl.textContent = rsiLast.toFixed(1) + (rsiLast>=70 ? " 超买" : rsiLast<=30 ? " 超卖" : " 中性");
+          rsiValEl.textContent = rsiLast.toFixed(1) + rsiState;
           rsiValEl.className = "rsi-val " + rsiCls;
         }
         var rctx = rsiCanvas.getContext("2d");
