@@ -43,16 +43,22 @@ session.headers.update(HEADERS)
 
 # ---------------------------------------------------------------- 基础设施
 
-def get_json(url, tries=3, timeout=15):
+def get_json(url, tries=5, timeout=15):
+    # 东财 push2his 对境外 runner 间歇性 RemoteDisconnected + 部分节点返回带 UTF-8 BOM 的 JSON
+    # （r.json() 会因 BOM 抛异常）。处理：utf-8-sig 解码容忍 BOM；重试 5 次指数退避；失败换备用域名。
+    # 备用域名 push2his2~6 与主域名负载均衡，独立限流桶，显著提升境外成功率。
     last = None
     for i in range(tries):
+        u = url
+        if "push2his.eastmoney.com" in url and i > 1:
+            u = url.replace("push2his.eastmoney.com", f"push2his{i % 5 + 2}.eastmoney.com")
         try:
-            r = session.get(url, timeout=timeout)
+            r = session.get(u, timeout=timeout)
             r.raise_for_status()
-            return r.json()
+            return json.loads(r.content.decode("utf-8-sig"))
         except Exception as e:  # noqa: BLE001 - 网络错误类型多，统一兜底
             last = e
-            time.sleep(0.6 * (i + 1))
+            time.sleep(0.5 * (2 ** i))
     raise RuntimeError(f"GET failed: {url[:120]} -> {last}")
 
 
@@ -163,7 +169,10 @@ def fetch_index_history():
     def one(item):
         secid = item[0]
         try:
-            return secid, fetch_kline(secid)
+            rows = fetch_kline(secid)
+            # 东财对境外 runner 偶发返回空 klines（HTTP 200 但 data.klines=[]）
+            # 单 secid 失败不抛：上层逐序列回退 fallback.sparks，避免拖垮整个指数块
+            return secid, rows or []
         except Exception:  # noqa: BLE001
             return secid, []
     with ThreadPoolExecutor(8) as ex:
@@ -468,6 +477,9 @@ def fetch_em_fut_hist(secid, today):
 
 def fetch_em_hist(secid):
     rows = fetch_kline(secid, limit=MACRO_HIST_DAYS + 5)
+    # 空 klines 视为失败：让上层单点兜底（当前价），避免写入空 hist
+    if not rows:
+        raise RuntimeError(f"empty klines for {secid}")
     return [{"date": r["date"], "close": r["close"]} for r in rows[-MACRO_HIST_DAYS:]]
 
 
@@ -535,11 +547,11 @@ def fetch_macro():
     with ThreadPoolExecutor(9) as ex:
         for key, rows in ex.map(lambda t: job(*t), jobs):
             hist[key] = [r["close"] for r in rows if r.get("close")]
-    # 沪金/沪油历史兜底：新浪 inner 接口偶尔为空
-    if not hist.get("au0") and "au0" in q and q["au0"]["price"]:
-        hist["au0"] = [q["au0"]["price"]]
-    if not hist.get("sc") and "sc" in q and q["sc"]["price"]:
-        hist["sc"] = [q["sc"]["price"]]
+    # 历史兜底：东财对境外 runner 偶发返回空 klines（已改为 fetch_em_hist 抛异常→job 返回 []）。
+    # 用当前价单点占位，避免 hist 键缺失；ret30 需 ≥2 点，单点显示为 —（不画 spark，但价格/涨跌正常）
+    for hk in ("au0", "sc", "usdjpy", "usdcnh", "dxy"):
+        if not hist.get(hk) and hk in q and q[hk].get("price"):
+            hist[hk] = [q[hk]["price"]]
 
     # CNY 折算
     usdcny = (q.get("usdcny") or {}).get("price")
@@ -922,8 +934,14 @@ def main():
         print("[fatal] 无指数数据，保留旧 data.js 不变", file=sys.stderr)
         return 2
     # 东财整段 502 时，A股区块整体用兜底快照，主看板块（新浪）不受影响
+    # 逐序列回退：某指数 klines 抓取失败（东财断连/限流）时，用 fallback.sparks 对应 secid 补齐，
+    # 保证 A股指数迷你走势图始终有数据（此前空序列绕过兜底，写入 data.js 导致无图）
+    fsparks = fb.get("sparks") or {}
+    for secid, rows in list(sparks.items()):
+        if not rows and fsparks.get(secid):
+            sparks[secid] = fsparks[secid]
     if not sparks:
-        sparks = fb.get("sparks") or {}
+        sparks = fsparks
     if not amt_hist:
         amt_hist = [{"date": a["date"], "amount": a["amount"]}
                     for a in ((fb.get("amount") or {}).get("history") or [])]
@@ -984,7 +1002,8 @@ def main():
     # 历史累积（按交易日）
     hist_path = HISTORY_PATH
     history = load_json(hist_path, [])
-    if breadth and score is not None:
+    # 只在「已收盘 + 数据全绿」时记入历史（盘前/盘中/降级不写，避免 fallback 残值污染历史走势）
+    if breadth and score is not None and state == "已收盘" and not degraded:
         entry = {
             "date": trade_date,
             "up": breadth["up"], "down": breadth["down"], "flat": breadth["flat"],
