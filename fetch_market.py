@@ -825,11 +825,12 @@ def fetch_macro():
         if not hist.get(hk) and hk in q and q[hk].get("price"):
             hist[hk] = [q[hk]["price"]]
 
-    # 归一化图历史：取一条 500 交易日长序列，前端按 周(5)/月(21)/年(250) 切片显示。
-    # 数据源：黄金/WTI/布伦特=Sina(20年)；日元/离岸=Frankfurter(ECB，东财已封)；
+    # 归一化图历史：取一条长序列（Sina 20-30年，前端按 周/月/年/10年 切片）。
+    # 数据源：黄金/WTI/布伦特=Sina(20-30年)；日元/离岸=Frankfurter(ECB，仅约2年)；
     # 沪金无可靠长源→用 XAU×USDCNY÷31.1035 合成（与 AU0 实测溢价 ~0.4%，仅用于归一化对比）。
     # 统一输出纯 close 数组（前端 vals/base 做除法，混入对象会得 NaN）。
-    CHART_MAX_DAYS = 500
+    # 注意：Frankfurter 最长约 520 交易日，10年档日元/离岸线会比其它线短（前端按各自长度归一）。
+    CHART_MAX_DAYS = 2500
     chart3 = {}
     w = {}
     for sym, skey in (("XAU", "xau"), ("CL", "wti"), ("OIL", "brent")):

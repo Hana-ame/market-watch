@@ -383,15 +383,16 @@
           <div class="panel-t">走势（归一化）</div>
           <div class="panel-sub"><span id="chartRange">—</span>
             <span class="chart-tabs">
-              <button class="chart-tab" data-w="1W">一周</button>
-              <button class="chart-tab" data-w="1M">一月</button>
+              <button class="chart-tab" data-w="10Y">十年</button>
               <button class="chart-tab" data-w="1Y">一年</button>
+              <button class="chart-tab" data-w="1M">一月</button>
+              <button class="chart-tab" data-w="1W">一周</button>
             </span>
           </div>
         </div>
         <div class="chart-box" id="macroChart"></div>
         <div class="legend" id="chartLegend"></div>
-        <div class="chart-note" id="chartNote">各品种以窗口首日为 100 归一，用来比较相对强弱；波动率不同，仅看方向与斜率，不代表等权收益。窗口可切 一周/一月/一年。</div>
+        <div class="chart-note" id="chartNote">各品种以窗口首日为 100 归一，用来比较相对强弱；波动率不同，仅看方向与斜率，不代表等权收益。窗口可切 十年/一年/一月/一周（日元、离岸人民币源仅约 2 年，十年档这两条线会较短）。</div>
       </section>
 
       <section class="panel">
@@ -765,10 +766,10 @@
     });
   }
 
-  // 归一化图当前窗口（1W=一周/1M=一月/1Y=一年），跨刷新保留
+  // 归一化图当前窗口（1W=一周/1M=一月/1Y=一年/10Y=十年），跨刷新保留
   var chartWin = "1Y";
   // 窗口 → 截取最近多少个交易日
-  var CHART_SLICE = {"1W": 5, "1M": 21, "1Y": 250};
+  var CHART_SLICE = {"1W": 5, "1M": 21, "1Y": 250, "10Y": 2500};
 
   function seriesSet(){
     // 用 chart3 长序列（500日）按窗口切片；缺失时退回 hist(30d)
