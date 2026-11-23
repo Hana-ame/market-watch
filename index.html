@@ -59,13 +59,19 @@
   .btn.busy{opacity:.55;pointer-events:none}
 
   /* ---------- tabs ---------- */
-  .nav{display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:10px}
+  .nav{display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:10px;flex-wrap:wrap;align-items:center}
   .navtab{
     background:transparent;border:1px solid transparent;border-radius:9px;padding:7px 16px;
     color:var(--muted);font-family:inherit;font-size:13.5px;cursor:pointer;transition:.15s;letter-spacing:.5px;
   }
   .navtab:hover{color:#cfdae7;background:#0f1822}
   .navtab.on{color:#ffd479;background:rgba(240,180,41,.09);border-color:rgba(240,180,41,.25)}
+  /* 导航里的外链（新标签打开）与分组标签 */
+  .navtab.navlink{text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+  .navtab.navlink em{font-style:normal;font-size:10px;opacity:.55}
+  .navtab.navlink:hover{color:#fff}
+  .nav-sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+  .nav-group{font-size:11px;color:var(--dim);letter-spacing:1px;margin-left:4px}
 
   /* ---------- summary ---------- */
   .summary{
@@ -354,10 +360,6 @@
     </div>
     <div class="actions">
       <span class="auto" id="autoHint">—</span>
-      <a class="btn" href="cycle.html" style="text-decoration:none;display:inline-block">利率 × 周期</a>
-      <a class="btn" href="liquidity.html" style="text-decoration:none;display:inline-block">美元流动性</a>
-      <a class="btn" href="reserves.html" style="text-decoration:none;display:inline-block">银行准备金</a>
-      <a class="btn" href="https://hana-ame.github.io/market-watch/earnings/" style="text-decoration:none;display:inline-block">AI 财报</a>
       <button class="btn" id="btnRefresh">刷新</button>
     </div>
   </header>
@@ -365,10 +367,18 @@
   <!-- 跨分栏总览条（overview）：A股 + 核心品种 + 宏观，由 renderOverview() 填充 -->
   <div class="overview" id="overview" style="display:none"></div>
 
+  <!-- 统一导航：站内区块（data-tab 切换）+ 外部工具页（data-ext 新标签打开） -->
   <nav class="nav">
     <button class="navtab on" data-tab="macro">核心品种</button>
     <button class="navtab" data-tab="metals">矿业期货</button>
     <button class="navtab" data-tab="ashare">A股盘面</button>
+    <span class="nav-sep"></span>
+    <a class="navtab navlink" href="https://hana-ame.github.io/market-watch/earnings/" target="_blank" rel="noopener">财报数据<em>↗</em></a>
+    <span class="nav-sep"></span>
+    <span class="nav-group">宏观专题</span>
+    <a class="navtab navlink" href="cycle.html" target="_blank" rel="noopener">利率 × 周期<em>↗</em></a>
+    <a class="navtab navlink" href="liquidity.html" target="_blank" rel="noopener">美元流动性<em>↗</em></a>
+    <a class="navtab navlink" href="reserves.html" target="_blank" rel="noopener">银行准备金<em>↗</em></a>
   </nav>
 
   <!-- ================= 核心品种 ================= -->
