@@ -833,7 +833,7 @@ def fetch_macro():
     CHART_MAX_DAYS = 2500
     chart3 = {}
     w = {}
-    for sym, skey in (("XAU", "xau"), ("CL", "wti"), ("OIL", "brent")):
+    for sym, skey in (("XAU", "xau"), ("XAG", "xag"), ("CL", "wti"), ("OIL", "brent")):
         try:
             w[skey] = [r["close"] for r in fetch_sina_hist_global(sym, CHART_MAX_DAYS)
                        if r.get("close")]
