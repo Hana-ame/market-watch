@@ -1811,6 +1811,10 @@
       var tab = t.dataset.tab;
       ["macro", "metals", "ashare"].forEach(function(k){ $("tab-" + k).hidden = (k !== tab); });
     });
+    // 键盘导航：Enter/Space 激活 tab（可访问性）
+    t.addEventListener("keydown", function(e){
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); t.click(); }
+    });
   });
   document.querySelectorAll("[data-btab]").forEach(function(t){
     t.addEventListener("click", function(){
