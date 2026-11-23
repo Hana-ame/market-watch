@@ -1317,7 +1317,11 @@
       // 柱顶标情绪分（score），直观看到每天情绪强弱变化
       var sc = x.score != null ? x.score : "";
       var scCol = sc === "" ? "var(--dim)" : (sc >= 60 ? "#ff6b78" : sc <= 40 ? "#0ecb81" : "#c9d6e4");
-      d.innerHTML = '<div style="text-align:center;font-family:var(--mono);font-size:10px;color:' + scCol + ';margin-bottom:2px">' + sc + '</div>'
+      // 柱子过窄（<25px，如历史累积到 120 天后）时隐藏情绪分标注（保留 tooltip），
+      // 避免标注挤成一团。宽度充足时显示。
+      var barPx = bb.clientWidth / Math.max(1, hist.length);
+      var showScore = barPx >= 25;
+      d.innerHTML = (showScore ? '<div style="text-align:center;font-family:var(--mono);font-size:10px;color:' + scCol + ';margin-bottom:2px">' + sc + '</div>' : '')
         + '<div style="height:' + Math.max(2, x.up/maxV*100) + '%;background:linear-gradient(180deg,#ff6b78,#c5303f);border-radius:2px 2px 0 0"></div>'
         + '<div style="height:' + Math.max(2, x.down/maxV*100) + '%;background:linear-gradient(180deg,#13d68a,#0a8f5a);border-radius:2px 2px 0 0"></div>';
       bb.appendChild(d);
