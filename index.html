@@ -204,6 +204,11 @@
   .idx-chg{display:flex;align-items:baseline;gap:9px;font-family:var(--mono);font-size:13px;margin-top:2px}
   .idx-chg .abs{font-size:11px;color:var(--dim)}
   .spark{display:block;width:100%;height:36px;margin-top:6px}
+  .sparkwrap{position:relative;margin-top:6px}
+  .sparkwrap .spark{margin-top:0}
+  .sparkwrap .lo,.sparkwrap .hi{position:absolute;right:3px;font-family:var(--mono);font-size:8.5px;line-height:1;opacity:.62;pointer-events:none}
+  .sparkwrap .hi{top:1px}
+  .sparkwrap .lo{bottom:1px;opacity:.5}
   .grid-board{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;margin-bottom:12px}
   .grid-board > .panel{margin-bottom:0}
   .breadth-nums{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px}
@@ -541,7 +546,7 @@
     <div>
       数据来源：新浪财经（伦敦金/银、WTI、布伦特、沪金/上海原油、LME 基本金属、COMEX 铜、人民币与日元汇率）· 东方财富（国内期货主连日线、A股、指数、快讯、美元指数、离岸人民币）。<br>
       人民币折算：黄金 = XAU × USDCNY ÷ 31.1035（元/克）；原油 = 报价 × USDCNY（元/桶）；日元 = USDCNY ÷ USDJPY × 100（元/百日元）。<br>
-      自动刷新：本地盘中每 5 分钟、夜盘每 10 分钟（WSL cron）；在线版 watch.moonchan.xyz 每天 23:10 由服务器抓取（GitHub Pages 为备份）；本页每 60 秒重载一次数据。仅供参考，不构成投资建议。
+      自动刷新：数据由 GitHub Actions 每日 3 次抓取并部署到 GitHub Pages（北京 08:17 / 12:17 / 20:17）；本页每 5 分钟轮询一次 data.js 检测更新，发现新数据自动重渲染。仅供参考，不构成投资建议。
     </div>
     <div class="r"><span id="footState">—</span><br><span class="num" id="footTs">—</span></div>
   </footer>
@@ -568,7 +573,9 @@
   var MKT = window.MKT;
   var $ = function(id){ return document.getElementById(id); };
   var uid = 0;
-  var REFRESH_MS = 60000;
+  // data.js 由 CI 每日 3 次更新（北京 08:17/12:17/20:17），60s 轮询 99.8% 拉到同一文件；
+  // 改 5 分钟轮询，请求量降 5 倍，仍能及时捕捉更新（最长延迟 5 分钟）
+  var REFRESH_MS = 300000;
 
   /* ---------------- helpers ---------------- */
   function fmt(n, d){
@@ -597,7 +604,7 @@
   function price(v, d){ return v === null || v === undefined || isNaN(v) ? "—" : Number(v).toLocaleString("zh-CN", {minimumFractionDigits:d, maximumFractionDigits:d}); }
 
   function sparkSVG(series, color, w, h){
-    w = w || 160; h = h || 38;
+    w = w || 160; h = h || 36;
     if(!series || series.length < 2) return "";
     var min = Math.min.apply(null, series), max = Math.max.apply(null, series);
     var span = (max - min) || 1, pad = 3;
@@ -607,12 +614,19 @@
     var line = pts.map(function(p, i){ return (i? "L":"M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
     var area = "M0 " + h + " " + pts.map(function(p){ return "L" + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ") + " L" + w + " " + h + " Z";
     var gid = "sg" + (++uid);
-    return '<svg class="spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">'
+    var svg = '<svg class="spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">'
       + '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">'
       + '<stop offset="0" stop-color="' + color + '" stop-opacity=".26"/>'
       + '<stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>'
       + '<path d="' + area + '" fill="url(#' + gid + ')"/>'
       + '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>';
+    // 量程标注：右上 max、右下 min（HTML 覆盖层，避免 SVG 拉伸变形文字）
+    if(max !== min){
+      var f = function(v){ return v >= 1000 ? v.toFixed(0) : v.toFixed(2); };
+      return '<div class="sparkwrap" style="color:' + color + '">' + svg
+        + '<span class="hi">' + f(max) + '</span><span class="lo">' + f(min) + '</span></div>';
+    }
+    return svg;
   }
 
   /* ---------------- macro ---------------- */
@@ -1163,7 +1177,7 @@
     $("mDegraded").innerHTML = (m.degraded && m.degraded.length) ? ' <span style="color:#f0b429">· ' + m.degraded.length + " 个数据源降级</span>" : "";
     document.title = "每日看盘 · 黄金/原油/日元 · " + ((M.as_of || "").slice(5, 16));
     var stale = (Date.now()/1000 - (m.generated_ts || 0)) > 3600;
-    $("autoHint").textContent = stale ? "数据已超 1 小时，请检查定时任务" : "数据自动刷新 · 每 60s";
+    $("autoHint").textContent = stale ? "数据已超 1 小时，请检查定时任务" : "数据自动刷新 · 每 5 分钟（跟随 CI 更新）";
     $("autoHint").style.color = stale ? "#f0b429" : "";
     $("mSummary").innerHTML = '<span class="tag">盘面</span>' + esc(MKT.summary || "—");
     $("aSummary").innerHTML = '<span class="tag">A股</span>' + esc(MKT.summary_ashare || "—");
@@ -1329,7 +1343,6 @@
   function tryBoot(i){
     var sources = [
       "data.js?v=" + Date.now(),
-      "https://watch.moonchan.xyz/data.js?t=" + Date.now(),
       "https://hana-ame.github.io/market-watch/data.js?t=" + Date.now()
     ];
     if(i >= sources.length){
