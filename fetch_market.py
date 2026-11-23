@@ -1296,7 +1296,10 @@ def main():
             h = idx_hist.get(secid) or {}
             if not h.get("c") and fsparks.get(secid):
                 sp = fsparks[secid]
-                idx_hist[secid] = {"d": [str(i) for i in range(len(sp))], "c": list(sp)}
+                # 日期兜底：优先用 spark_dates（上证真实日期）对齐，长度不够时才用序号占位
+                dd = (spark_dates[-len(sp):] if len(spark_dates) >= len(sp)
+                      else [str(i) for i in range(len(sp))])
+                idx_hist[secid] = {"d": dd, "c": list(sp)}
     if not amt_hist:
         amt_hist = [{"date": a["date"], "amount": a["amount"]}
                     for a in ((fb.get("amount") or {}).get("history") or [])]
