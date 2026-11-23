@@ -854,7 +854,7 @@
       // USDJPY 30日波动极小（常 <1%），归一化后近乎水平线，易被金/油大波动线视觉淹没；
       // 加白色光晕(halo)并最后绘制，保证这条「基准=100 附近的水平线」一眼可辨
       {name:"美元/日元",  color:"#4c8dff", vals:h.usdjpy, halo:true},
-      {name:"离岸人民币", color:"#0ecb81", vals:h.usdcnh},
+      {name:"美元/人民币", color:"#0ecb81", vals:h.usdcnh},
     ];
     return defs.filter(function(d){ return d.vals && d.vals.length > 1; }).map(function(d){
       var base = d.vals[0] || 1;
