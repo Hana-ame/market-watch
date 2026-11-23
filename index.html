@@ -157,6 +157,15 @@
   .rsi-val.oversold{color:#0ecb81}
   .rsi-val.near-hot{color:#e0a458}
   .rsi-val.near-cold{color:#8496ab}
+  .chip-block{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}
+  .chip-block .rsi-val{color:#e6eef7}
+  .chipbar-wrap{display:flex;align-items:flex-end;gap:1px;height:120px}
+  .chipbar-wrap .cbar{flex:1;border-radius:1px 1px 0 0;min-height:2px}
+  .chipbar-wrap .cbar.profit{background:linear-gradient(180deg,#ff6b78,#c5303f)}
+  .chipbar-wrap .cbar.trap{background:linear-gradient(180deg,#4c8dff,#1a4a8f)}
+  .chipbar-wrap .costline{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed #e6eef7}
+  .chip-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:6px}
+  .chip-meta b{color:#e6eef7;font-family:var(--mono)}
   .chart-tab{background:#101923;color:#8ba0b4;border:1px solid var(--line);border-radius:5px;padding:2px 9px;font-size:10.5px;cursor:pointer;font-family:var(--mono)}
   .chart-tab:hover{color:#c9d6e4;border-color:#2f4a66}
   .chart-tab.on{background:#1d2c3d;color:#ffd166;border-color:#3d5a7a;font-weight:700}
@@ -432,6 +441,10 @@
     <div class="rsi-block" id="rsiBlock" hidden>
       <div class="rsi-h"><span>RSI(14) 相对强弱</span><span class="rsi-val" id="rsiVal">—</span></div>
       <div class="chart-box" style="height:110px"><canvas id="rsiChart" role="img" aria-label="RSI 相对强弱指标：显示所选品种的 RSI(14) 走势，30 超卖、70 超买参考线"></canvas></div>
+    </div>
+    <div class="chip-block" id="chipBlock" hidden>
+      <div class="rsi-h"><span>筹码分布（获利盘 <span id="chipProfit">—</span>）</span><span class="rsi-val" id="chipAvgCost">均价 —</span></div>
+      <div class="chart-box" style="height:120px"><canvas id="chipChart" role="img" aria-label="筹码分布：显示当前价格下的筹码堆积分布，获利盘红色、套牢盘蓝色"></canvas></div>
     </div>
     <div class="cyq-meta" id="pcSummary" style="margin-top:8px">—</div>
     <div class="chart-note" id="pcNote">Y 轴为真实价格（非归一化）。数据源：Sina 全局期货日线 / Frankfurter（ECB）。</div>
@@ -1766,6 +1779,40 @@
     // 动态更新 aria-label 反映当前品种（可访问性）
     var pcCanvas = document.getElementById("priceChart");
     if(pcCanvas){ pcCanvas.setAttribute("aria-label", meta.name + " 价格走势图：显示价格走势、MA50/MA200 均线，悬停查看具体数值"); }
+
+    // 筹码分布副图：从 chip 数据找当前品种的 dist（[[价, 占比%]]），获利盘红/套牢盘蓝
+    var chipBlock = document.getElementById("chipBlock");
+    var chipCanvas = document.getElementById("chipChart");
+    var chipProfitEl = document.getElementById("chipProfit");
+    var chipAvgCostEl = document.getElementById("chipAvgCost");
+    var chipRec = null;
+    try {
+      var chipList = MKT.chip || [];
+      var codeNum = (MKT.indices && MKT.indices[0] && MKT.indices[0].code) || "";
+      // 从 WATCHLIST A股 code 匹配 chip（chip.code 为 6 位数字）
+      var aCodes = (MKT.watchlist || []).filter(function(g){ return g.market === "A"; })
+        .reduce(function(acc, g){ return acc.concat(g.items.map(function(it){ return it.code; })); }, []);
+      // priceSym 是 secid（如 0.002594），chip.code 是 6 位数字——从 secid 提取
+      var secidNum = priceSym.split(".")[1];
+      chipRec = chipList.find(function(c){ return c.code === secidNum; }) || null;
+    } catch(e) { chipRec = null; }
+    if(chipBlock && chipCanvas && chipRec && chipRec.dist && chipRec.dist.length){
+      chipBlock.hidden = false;
+      // 获利比例 + 均成本
+      if(chipProfitEl) chipProfitEl.textContent = chipRec.profit_ratio.toFixed(1) + "%";
+      if(chipAvgCostEl) chipAvgCostEl.textContent = "均成本 " + chipRec.avg_cost.toFixed(2);
+      // 画筹码分布柱状图（获利盘红、套牢盘蓝）
+      var dist = chipRec.dist;
+      var maxShare = Math.max.apply(null, dist.map(function(d){ return d[1]; }));
+      var barsHtml = dist.map(function(d){
+        var h = Math.max(2, d[1]/maxShare*100);
+        var cls = d[0] < chipRec.price ? "profit" : "trap";
+        return '<div class="cbar ' + cls + '" style="height:' + h + '%" title="' + d[0] + ' 占比 ' + d[1] + '%"></div>';
+      }).join("");
+      chipCanvas.parentNode.innerHTML = '<div class="chipbar-wrap" style="position:relative">' + barsHtml + '</div>';
+    } else {
+      chipBlock.hidden = true;
+    }
 
     // 周期涨跌摘要条：一次性算该品种各档涨跌幅（基于 chart3 长序列，不受当前窗口影响）
     var sumEl = document.getElementById("pcSummary");
