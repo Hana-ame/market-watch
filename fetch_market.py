@@ -114,11 +114,23 @@ FIELDS_QUOTE = "f2,f3,f4,f5,f6,f12,f13,f14,f15,f16,f17,f18"
 
 
 def fetch_indices():
-    secids = ",".join(s for s, _, _ in INDICES)
-    d = get_json("https://push2.eastmoney.com/api/qt/ulist.np/get"
-                 f"?fltt=2&invt=2&secids={secids}&fields={FIELDS_QUOTE}")
-    raw = (d.get("data") or {}).get("diff") or []
-    by_code = {str(x.get("f12")): x for x in raw}
+    # 东财 ulist 批量接口对境外 runner 偶发 502（8 secid 长 URL 更明显，曾连续 3 次 CI 502）。
+    # 拆两批（每批 4 个）+ 多试，降低单请求复杂度——与 fetch_watchlist 同策略。
+    by_code = {}
+    secids = [s for s, _, _ in INDICES]
+    for chunk in (secids[:4], secids[4:]):
+        if not chunk:
+            continue
+        for attempt in range(3):
+            try:
+                d = get_json("https://push2.eastmoney.com/api/qt/ulist.np/get"
+                             f"?fltt=2&invt=2&secids={','.join(chunk)}&fields={FIELDS_QUOTE}",
+                             tries=1, timeout=25)
+                for x in ((d.get("data") or {}).get("diff") or []):
+                    by_code[str(x.get("f12"))] = x
+                break
+            except Exception:  # noqa: BLE001
+                time.sleep(1.5 * (attempt + 1))
     out = []
     for secid, name, short in INDICES:
         code = secid.split(".")[1]
