@@ -1309,7 +1309,13 @@ def main():
     # 避免 09:00 盘前把“昨天收盘”伪装成今天的行情。
     trade_date = spark_dates[-1] if spark_dates else now.strftime("%Y-%m-%d")
 
-    qtime = safe("quote_time", fetch_quote_time)
+    # quote_time 仅用于判断「今日是否开市」，失败时有兜底（trading_today=True 不误判休市），
+    # 不计入 degraded——它不影响任何行情数据，计入会让用户误以为整站降级。
+    try:
+        qtime = fetch_quote_time()
+    except Exception as e:  # noqa: BLE001
+        qtime = None
+        print(f"[warn] quote_time failed: {e}", file=sys.stderr)
     # 拿不到报价时间时不判断休市（避免接口 502 把正常交易日误标成“今日不开市”）
     trading_today = True if qtime is None else (qtime.strftime("%Y-%m-%d") == now.strftime("%Y-%m-%d"))
     state = market_state(now)
