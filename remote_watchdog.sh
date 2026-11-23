@@ -6,7 +6,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG="$DIR/data/watchdog.log"
 URL="https://hana-ame.github.io/market-watch/data.js"
 REPO="Hana-ame/market-watch"
-MAX_AGE="${MAX_AGE:-93600}"   # 26 小时：线上每天 23:10 更新一次，超一天多才补触发
+MAX_AGE="${MAX_AGE:-43200}"   # 12 小时：cron 每 6h 窗口（17 */6），连续 2 个窗口未跑才补触发
 GH="${GH:-/usr/bin/gh}"
 
 mkdir -p "$DIR/data"

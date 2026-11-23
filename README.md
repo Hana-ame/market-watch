@@ -21,7 +21,7 @@ GitHub 仓库（代码镜像）：https://github.com/Hana-ame/market-watch （PU
    ```sh
    gh api -X POST repos/Hana-ame/market-watch/dispatches -f event_type=refresh
    ```
-3. **本机看门狗**：`remote_watchdog.sh`（WSL cron）读取线上 `data.js` 的 `generated_ts`，超过 26 小时未更新才 dispatch；线上正常时只做一次 curl。
+3. **本机看门狗**：`remote_watchdog.sh`（WSL cron）读取线上 `data.js` 的 `generated_ts`，超过 12 小时未更新才 dispatch（cron 每 6h 窗口，连续 2 个窗口未跑即补触发）；线上正常时只做一次 curl。
 3. **A股兜底快照**：CI 在「已收盘 + 无降级」时把 A股区块（指数/宽度/板块/涨停/自选）写入 `data/fallback.json` 并在每个交易日回写一次；若某次境外取数被东财 502，脚本用该快照填充 A股页，页头标注「N 个数据源降级」，主看板块（金/油/日元/矿业）不受影响。
 4. **push 触发**：改代码/文档推送 main 也会立即刷新并部署一次。
 
