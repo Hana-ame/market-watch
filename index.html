@@ -1506,6 +1506,21 @@
     var start = Math.max(0, allC.length - take);
     var dates = allDates.slice(start);
     var vals = allC.slice(start);
+
+    // 移动平均线：在切片前用全序列计算（否则窗口起点处 MA 值不准）。
+    // ma(n) 返回与 vals 等长的数组；前 n-1 个点数据不足记 null（Chart.js 断线）。
+    function calcMA(n){
+      var out = new Array(allC.length).fill(null);
+      var sum = 0;
+      for(var i=0;i<allC.length;i++){
+        sum += allC[i];
+        if(i >= n) sum -= allC[i-n];
+        if(i >= n-1) out[i] = sum / n;
+      }
+      return out.slice(start);   // 与窗口对齐
+    }
+    var ma50  = calcMA(50);
+    var ma200 = calcMA(200);
     var canvas = document.getElementById("priceChart");
     if(!canvas) return;
 
@@ -1517,13 +1532,22 @@
       : '—';
 
     var ctx = canvas.getContext("2d");
+    // MA 线：仅在窗口足够长（≥60 交易日）时叠加，短线图（一周/一月）显示会显杂乱
+    var showMA = vals.length >= 60;
+    var datasets = [{
+      label: meta.name, data: vals,
+      borderColor: meta.color, backgroundColor: meta.color,
+      borderWidth: 1.6, pointRadius: 0, tension: 0.1, fill: false
+    }];
+    if(showMA){
+      datasets.push({label:"MA50",  data:ma50,  borderColor:"#ff9f43", borderWidth:1.2,
+                     pointRadius:0, tension:0.1, fill:false, spanGaps:false});
+      datasets.push({label:"MA200", data:ma200, borderColor:"#a29bfe", borderWidth:1.2,
+                     pointRadius:0, tension:0.1, fill:false, spanGaps:false});
+    }
     var data = {
       labels: dates,   // 真实日期，Tooltip 显示「日期 价格」
-      datasets: [{
-        label: meta.name, data: vals,
-        borderColor: meta.color, backgroundColor: meta.color,
-        borderWidth: 1.6, pointRadius: 0, tension: 0.1, fill: false
-      }]
+      datasets: datasets
     };
     var opts = {
       responsive: true, maintainAspectRatio: false,
@@ -1533,7 +1557,7 @@
         tooltip: {
           callbacks: {
             title: function(items){ var i=items[0].dataIndex; return dates[i] || ""; },
-            label: function(c){ return c.parsed.y.toFixed(meta.dp) + " " + meta.unit; }
+            label: function(c){ return c.dataset.label + ": " + c.parsed.y.toFixed(meta.dp) + " " + meta.unit; }
           }
         }
       },
