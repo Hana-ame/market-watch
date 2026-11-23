@@ -2,13 +2,11 @@ name: Refresh & deploy market-watch
 
 on:
   schedule:
-    # 每天早 / 中 / 晚各跑一次（用户口径），错开整点避免队列拥堵：
-    #  - 08:17 北京 = 00:17 UTC  早盘前 / 隔夜美股财报
-    #  - 12:17 北京 = 04:17 UTC  A股午间休市 / 早间快讯
-    #  - 20:17 北京 = 12:17 UTC  美股盘前 / 港股收盘后 / 晚间复盘
-    - cron: "17 0 * * *"
-    - cron: "17 4 * * *"
-    - cron: "17 12 * * *"
+    # 实测 GitHub Actions 免费公共仓库 schedule 不可靠：3 个离散 cron 每天只触发 1 次且延迟数小时
+    #（高峰/低活跃仓库节流）。改用连续窗口 cron（每 6h 一个窗口，GitHub 在窗口内调度，比离散点
+    # 错过即失效更可靠）：UTC 01:17/09:17/17:17 = 北京 09:17/17:17/次日 01:17，覆盖早/晚/夜。
+    # 若仍节流，至少保证每天 ≥1 次（兜底），push/workflow_dispatch 仍可手动触发。
+    - cron: "17 */6 * * *"
   workflow_dispatch:
   push:
     branches: [main]

@@ -8,15 +8,15 @@
 **GitHub Pages（唯一入口）：https://hana-ame.github.io/market-watch/** — Actions 部署；境外 runner 偶发被东财 502，页面有 A股兜底快照。
 
 GitHub 仓库（代码镜像）：https://github.com/Hana-ame/market-watch （PUBLIC）
-- GitHub Actions **每天早/中/晚三次**跑 `fetch_market.py` + 财报分析（cron `17 0` / `17 4` / `17 12` UTC = 北京 08:17 / 12:17 / 20:17），把 `index.html` + 生成的 `data.js` + `earnings/` 作为 Pages 产物部署；`data.js` 不入库。
+- GitHub Actions **每 6 小时窗口**跑 `fetch_market.py` + 财报分析（cron `17 */6` UTC = 北京 09:17 / 17:17 / 次日 01:17），把 `index.html` + 生成的 `data.js` + `earnings/` 作为 Pages 产物部署；`data.js` 不入库。
 - `data/history.json` 每个交易日只回写一次（要求已收盘、无降级、当日尚未记录），用于「近期节奏」多日累积。
 - 境外 runner 偶发被东财接口 502（页面右上角会显示「N 个数据源降级」）；全市场分页已降到 6 并发 + 每页 4 次指数退避，自选股拆两批独立重试，最近一次 run 无降级。
 
 ## GitHub Pages 更新保障
 
-目标是**每天更新三次**（用户口径：早/中/晚）。GitHub 的 `schedule` 是 best-effort（可能延迟、合并甚至长时间不触发），所以仍有兜底：
+目标是**每天更新三次**（用户口径：早/中/晚）。实测 GitHub 免费公共仓库 schedule 不可靠（3 个离散 cron 每天只触发 1 次且延迟数小时），改用连续窗口 cron 提升触发率。GitHub 的 `schedule` 是 best-effort（可能延迟、合并甚至长时间不触发），所以仍有兜底：
 
-1. **定时**：`17 0` / `17 4` / `17 12`（UTC，即北京 08:17 / 12:17 / 20:17）触发 workflow；
+1. **定时**：`17 */6`（UTC，即北京 09:17 / 17:17 / 次日 01:17）触发 workflow；
 2. **手动/兜底**：workflow 支持 `repository_dispatch`，可随时触发一次：
    ```sh
    gh api -X POST repos/Hana-ame/market-watch/dispatches -f event_type=refresh
@@ -88,7 +88,7 @@ E:\market-watch\index.html
 - **入口**：主站导航「AI 财报」→ `earnings/index.html`（GitHub Pages 部署到 `/market-watch/earnings/`）。
 - **数据**：`fetch_earnings.py` 确定性抓取三市场——美股 SEC EDGAR XBRL `companyfacts`（AAPL/MSFT/NVDA 等）、A股东方财富 `RPT_LICO_FN_CPD` 业绩报表、港股东方财富 `RPT_HKF10_FN_MAININDICATOR`（腾讯/阿里/美团），输出 `data/earnings_raw.json`。
 - **分析**：CI 里用 Pi Coding Agent（`pi --provider google --model gemini-3.1-flash-lite --offline --no-session -p "$(cat prompt.md)"`）读 raw 数据、生成含市场总览/三市场卡片/风险提示的 `dist/earnings/index.html`；LLM 密钥走 GitHub Secret `GEMINI_API_KEY`。模型选 **gemini-3.1-flash-lite**（Free Tier 独立配额桶；`gemini-3-flash` 仅 20 次/天且 `-preview` 会被归一化，易撞 429）。`--offline --no-session` 禁用启动网络检查/会话持久化，规避 CI 无 TTY 下 pi 卡死（实测 CI 里 10s 完成）。pi 三次重试全失败时，部署仓库兜底页 `earnings/index.html`，保证 `/earnings/` 始终可访问。
-- **调度**：`.github/workflows/update.yml` 每天**早/中/晚**三次（北京 08:17 / 12:17 / 20:17）跑完整站点 + 财报分析并部署 Pages。
+- **调度**：`.github/workflows/update.yml` **每 6 小时窗口**（北京 09:17 / 17:17 / 次日 01:17）跑完整站点 + 财报分析并部署 Pages。
 - **免责声明**：页面底部固定「数据来自公开渠道（SEC EDGAR / 东方财富），分析由 AI 自动生成，仅供参考，不构成投资建议」。
 - **部署**：仅 GitHub Pages（`/market-watch/earnings/`），由 CI 生成并发布；不依赖自托管。
 
