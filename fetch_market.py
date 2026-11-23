@@ -1008,6 +1008,9 @@ def main():
 
     if not breadth:
         breadth = prev.get("breadth") or fb.get("breadth")
+        # 用上一交易日快照（昨收）时标记 stale，前端显示「昨收数据」避免误认今日
+        if breadth:
+            breadth["stale"] = True
     if not amt_hist and breadth:
         amt_hist = [{"date": a["date"], "amount": a["amount"]}
                     for a in ((fb.get("amount") or {}).get("history") or [])]

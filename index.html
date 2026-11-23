@@ -1024,7 +1024,7 @@
     $("lgUp").textContent = upP.toFixed(1) + "%";
     $("lgDown").textContent = dnP.toFixed(1) + "%";
     $("lgTotal").textContent = "有效 " + fmt(b.total, 0) + (b.universe ? " / " + fmt(b.universe, 0) : "") + " 只";
-    $("breadthSub").textContent = (MKT.meta || {}).trade_date || "";
+    $("breadthSub").textContent = ((MKT.meta || {}).trade_date || "") + (b.stale ? " · 昨收数据" : "");
     $("kMedian").innerHTML = '<span class="' + cls(b.median) + '">' + pct(b.median) + '</span>';
     var lu = MKT.limit_up && MKT.limit_up.count, ld = MKT.limit_down && MKT.limit_down.count;
     $("kLimit").innerHTML = '<span class="up">' + (lu==null?"—":lu) + '</span><small>/</small><span class="down">' + (ld==null?"—":ld) + '</span>';
