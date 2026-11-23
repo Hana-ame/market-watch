@@ -951,6 +951,14 @@ def main():
 
     indices = safe("indices", fetch_indices)
     indices_fresh = bool(indices)  # 东财 ulist 实时成功（未用 prev/fb 兜底）
+    # 部分成功（批拆分后某批 502）：用 prev/fb 补缺失 code，保证 8 个都显示（缺卡比旧值更糟）
+    if indices and len(indices) < len(INDICES):
+        have = {it.get("code") for it in indices}
+        for src in (prev, fb):
+            for it in (src.get("indices") or []):
+                if it.get("code") and it.get("code") not in have:
+                    indices.append(it)
+                    have.add(it["code"])
     sparks, spark_dates, amt_hist = safe("kline", fetch_index_history, ({}, [], []))
     boards = safe("boards", fetch_boards, {})
     if not boards:
