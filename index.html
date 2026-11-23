@@ -1308,7 +1308,11 @@
       var d = document.createElement("div");
       d.style.cssText = "flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;height:100%";
       d.title = x.date + " 涨 " + x.up + " / 跌 " + x.down;
-      d.innerHTML = '<div style="height:' + Math.max(2, x.up/maxV*100) + '%;background:linear-gradient(180deg,#ff6b78,#c5303f);border-radius:2px 2px 0 0"></div>'
+      // 柱顶标情绪分（score），直观看到每天情绪强弱变化
+      var sc = x.score != null ? x.score : "";
+      var scCol = sc === "" ? "var(--dim)" : (sc >= 60 ? "#ff6b78" : sc <= 40 ? "#0ecb81" : "#c9d6e4");
+      d.innerHTML = '<div style="text-align:center;font-family:var(--mono);font-size:10px;color:' + scCol + ';margin-bottom:2px">' + sc + '</div>'
+        + '<div style="height:' + Math.max(2, x.up/maxV*100) + '%;background:linear-gradient(180deg,#ff6b78,#c5303f);border-radius:2px 2px 0 0"></div>'
         + '<div style="height:' + Math.max(2, x.down/maxV*100) + '%;background:linear-gradient(180deg,#13d68a,#0a8f5a);border-radius:2px 2px 0 0"></div>';
       bb.appendChild(d);
     });
