@@ -1606,10 +1606,13 @@
     var ctx = canvas.getContext("2d");
     // MA 线：仅在窗口足够长（≥60 交易日）时叠加，短线图（一周/一月）显示会显杂乱
     var showMA = vals.length >= 60;
+    // 少数据点（一周/一月）时用平滑曲线+粗线让折线不生硬；多数据点用细线保细节
+    var smooth = vals.length < 40 ? 0.4 : 0.1;
+    var lw = vals.length < 40 ? 2.2 : 1.6;
     var datasets = [{
       label: meta.name, data: vals,
       borderColor: meta.color, backgroundColor: meta.color,
-      borderWidth: 1.6, pointRadius: 0, tension: 0.1, fill: false
+      borderWidth: lw, pointRadius: 0, tension: smooth, fill: false
     }];
     if(showMA){
       datasets.push({label:"MA50",  data:ma50,  borderColor:"#ff9f43", borderWidth:1.2,
