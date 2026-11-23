@@ -913,8 +913,10 @@ def build_summary(snap):
     if breadth:
         up, down = breadth["up"], breadth["down"]
         ratio = up / max(1, up + down) * 100
+        stale_tag = "（昨收数据）" if breadth.get("stale") else ""
         parts.append(f"全市场 {up:,} 涨 / {down:,} 跌（上涨占比 {ratio:.0f}%，"
-                     f"涨跌中位数 {pct_text(breadth['median'])}），涨停 {limit_up} 家、跌停 {limit_down} 家。")
+                     f"涨跌中位数 {pct_text(breadth['median'])}）{stale_tag}，"
+                     f"涨停 {limit_up} 家、跌停 {limit_down} 家。")
     amt = snap.get("amount", {}).get("today")
     prev = snap.get("amount", {}).get("prev")
     if amt:
