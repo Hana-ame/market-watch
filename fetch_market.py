@@ -254,8 +254,8 @@ def compute_chip_distribution(klines, floats=None):
     last = recent[-1]
     cur = last["close"]
     below = sum(x[: int((cur - lo) / acc) + 1])
-    # 降采样到 ~24 桶给前端画直方图（[价, 筹码占比%]），原始 150 桶太大
-    n_out = 24
+    # 降采样给前端画直方图（[价, 筹码占比%]），原始 150 桶太大；44 桶更细腻
+    n_out = 44
     step = CHIP_FACTOR / n_out
     dist = []
     for b in range(n_out):
