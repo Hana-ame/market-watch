@@ -1578,7 +1578,7 @@
         if(i >= n) sum -= allC[i-n];
         if(i >= n-1) out[i] = sum / n;
       }
-      return out.slice(start);   // 与窗口对齐
+      return out.slice(-take);   // 与窗口对齐（按 take 切片，非 start）
     }
     var ma50  = calcMA(50);
     var ma200 = calcMA(200);
