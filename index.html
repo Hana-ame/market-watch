@@ -381,9 +381,9 @@
 
   <!-- 统一导航：站内区块（data-tab 切换）+ 外部工具页（data-ext 新标签打开） -->
   <nav class="nav">
-    <button class="navtab on" data-tab="macro">核心品种</button>
-    <button class="navtab" data-tab="metals">矿业期货</button>
-    <button class="navtab" data-tab="ashare">A股盘面</button>
+    <button class="navtab on" data-tab="macro" role="tab" aria-selected="true">核心品种</button>
+    <button class="navtab" data-tab="metals" role="tab" aria-selected="false">矿业期货</button>
+    <button class="navtab" data-tab="ashare" role="tab" aria-selected="false">A股盘面</button>
     <span class="nav-sep"></span>
     <a class="navtab navlink" href="https://hana-ame.github.io/market-watch/earnings/" target="_blank" rel="noopener">财报数据<em>↗</em></a>
     <span class="nav-sep"></span>
@@ -1806,8 +1806,12 @@
   /* ---------------- interactions ---------------- */
   document.querySelectorAll(".navtab[data-tab]").forEach(function(t){
     t.addEventListener("click", function(){
-      document.querySelectorAll(".navtab[data-tab]").forEach(function(x){ x.classList.remove("on"); });
+      document.querySelectorAll(".navtab[data-tab]").forEach(function(x){
+        x.classList.remove("on");
+        x.setAttribute("aria-selected", "false");
+      });
       t.classList.add("on");
+      t.setAttribute("aria-selected", "true");
       var tab = t.dataset.tab;
       ["macro", "metals", "ashare"].forEach(function(k){ $("tab-" + k).hidden = (k !== tab); });
     });
