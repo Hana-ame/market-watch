@@ -291,6 +291,12 @@
   .cyq-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);flex-wrap:wrap;gap:4px;margin-top:2px}
   .cyq-meta span b{color:#c9d6e4;font-weight:600}
   @media (max-width:900px){ .cyqwrap{grid-template-columns:1fr} }
+  /* W/M/Y 窗口切换标签 */
+  .cyq-tabs{display:inline-flex;gap:2px;margin-left:10px;vertical-align:middle}
+  .cyq-tab{background:#101923;color:#8ba0b4;border:1px solid var(--line);border-radius:5px;padding:2px 9px;font-size:10.5px;cursor:pointer;font-family:var(--mono)}
+  .cyq-tab:hover{color:#c9d6e4;border-color:#2f4a66}
+  .cyq-tab.on{background:#1d2c3d;color:#ffd166;border-color:#3d5a7a;font-weight:700}
+  .cyq-win{font-style:normal;font-size:9.5px;color:var(--dim);font-family:var(--mono);margin-left:8px;padding:1px 6px;border:1px solid var(--line);border-radius:4px;background:#101923;white-space:nowrap}
   .hbars{display:flex;align-items:flex-end;gap:2px;height:52px}
   .hbars .h{flex:1;background:linear-gradient(180deg,#2f4a66,#1b2c3d);border-radius:2px 2px 0 0;min-height:2px}
   .hbars .h.up{background:linear-gradient(180deg,#ff6b78,#c5303f)}
@@ -1306,6 +1312,9 @@
     }
   }
 
+  // 筹码分布当前选中的回看窗口（W=近3月 / M=近半年 / Y=近一年），跨刷新保留
+  var chipWindow = "M";
+
   function renderChip(){
     var box = $("chipBox"); if(!box) return;
     var list = MKT.chip || [];
@@ -1316,9 +1325,23 @@
       if(g.market !== "A") return;
       g.items.forEach(function(it){ names[it.code] = it.name; });
     });
-    $("chipSub").textContent = "A股自选股 · 获利比例 / 平均成本 / 筹码集中度";
+
+    // 窗口切换标签（放在面板标题行）：切换后重画所有卡片
+    var tabs = [["W","3月"],["M","半年"],["Y","1年"]];
+    var tabsHtml = '<div class="cyq-tabs">' + tabs.map(function(p){
+      return '<button class="cyq-tab' + (chipWindow===p[0] ? " on" : "") + '" data-win="' + p[0] + '">' + p[1] + '</button>';
+    }).join("") + '</div>';
+    $("chipSub").innerHTML = '<span>A股自选股 · 获利比例 / 平均成本 / 集中度</span>' + tabsHtml;
+    $("chipSub").querySelectorAll(".cyq-tab").forEach(function(b){
+      b.addEventListener("click", function(){ chipWindow = b.dataset.win; renderChip(); });
+    });
+
     box.innerHTML = "";
-    list.forEach(function(c){
+    var winLabel = "近半年";
+    list.forEach(function(item){
+      var c = item[chipWindow] || item["M"] || item["Y"] || item["W"];
+      if(!c) return;
+      winLabel = c.window_label || winLabel;
       var prof = c.profit_ratio;
       var cls_ = prof >= 50 ? "up" : "down";
       var d = document.createElement("div"); d.className = "cyq";
@@ -1338,7 +1361,8 @@
       var pricePct = Math.max(0, Math.min(100, (c.price - lo)/span*100));
 
       d.innerHTML =
-        '<div class="cyq-h"><span class="cn">' + esc(names[c.code] || c.code) + '</span>'
+        '<div class="cyq-h"><span class="cn">' + esc(names[c.code] || c.code) + ' '
+        + '<i class="cyq-win">' + esc(winLabel) + '</i></span>'
         + '<span class="cm">获利 <b class="profit ' + cls_ + '">' + prof + '%</b>'
         + ' · 均成本 <b>' + fmt(c.avg_cost) + '</b>'
         + ' · 90%筹码 <b>' + c.pct90.range[0] + '–' + c.pct90.range[1] + '</b>'

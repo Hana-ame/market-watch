@@ -191,14 +191,16 @@ CHIP_FACTOR = 150       # 东财同款：价格区间切 150 格
 CHIP_RANGE = 120        # 回看最近 120 根 K 线
 
 
-def compute_chip_distribution(klines, floats=None):
+def compute_chip_distribution(klines, floats=None, range_days=None):
     """纯 Python 复刻东财 CYQCalculator（三角分布筹码模型）。
     klines: [{date,open,high,low,close,volume}]（按日期升序）
-    floats: 流通股本（股）。换手率 = 成交量 / floats；缺省时按「每日成交 1/120 流通盘」近似。
+    floats: 流通股本（股）。换手率 = 成交量 / floats；缺省时按「每日成交 1/N 流通盘」近似。
+    range_days: 回看 K 线根数（缺省 CHIP_RANGE=120）。用于 W/M/Y 切换窗口。
     返回最新一日的筹码分布指标 dict。"""
     if not klines:
         return None
-    recent = klines[-CHIP_RANGE:]
+    nwin = range_days or CHIP_RANGE
+    recent = klines[-nwin:]
     hi = max(r["high"] for r in recent)
     lo = min(r["low"] for r in recent)
     if hi <= lo:
@@ -215,7 +217,7 @@ def compute_chip_distribution(klines, floats=None):
         if floats:
             hsl = min(1.0, (v / floats))
         else:
-            hsl = min(1.0, 1 / CHIP_RANGE)
+            hsl = min(1.0, 1 / nwin)
         H = int((h - lo) / acc)
         L = int(round((l - lo) / acc))
         g0 = (CHIP_FACTOR - 1) if h == l else 2 / (h - l)
@@ -293,24 +295,40 @@ def fetch_floats_tencent(symbol):
         return None
 
 
+# W/M/Y 三档回看窗口（交易日）。腾讯日线一次可取 500 根（约 2 年），足够三档
+CHIP_WINDOWS = {
+    "W": {"days": 20, "label": "近 3 个月"},
+    "M": {"days": 60, "label": "近半年"},
+    "Y": {"days": 250, "label": "近一年"},
+}
+
+
 def fetch_chip(symbols):
-    """给若干 A股代码（'600519'=贵州茅台 形式）算筹码分布指标。"""
+    """给若干 A股代码（'600519'=贵州茅台 形式）算筹码分布指标。
+    每只返回 W/M/Y 三档窗口的结果（同一份 K 线重算，前端可即时切换）。
+    返回 {code: {W:res, M:res, Y:res, name_key}} 结构的列表。"""
     out = []
     for code in symbols:
         market = "1" if code.startswith("6") else "0"
         secid = f"{market}.{code}"
         symbol = ("sh" if market == "1" else "sz") + code
         try:
-            kl = fetch_kline_tencent(secid, CHIP_RANGE)
+            kl = fetch_kline_tencent(secid, 500)
         except Exception:  # noqa: BLE001
             kl = []
         if not kl:
             continue
         floats = fetch_floats_tencent(symbol)
-        res = compute_chip_distribution(kl, floats)
-        if res:
-            res["code"] = code
-            out.append(res)
+        windows = {}
+        for key, cfg in CHIP_WINDOWS.items():
+            res = compute_chip_distribution(kl, floats, range_days=cfg["days"])
+            if res:
+                res["code"] = code
+                res["window_label"] = cfg["label"]
+                windows[key] = res
+        if windows:
+            windows["code"] = code
+            out.append(windows)
     return out
 
 
