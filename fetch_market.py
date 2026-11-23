@@ -938,6 +938,7 @@ def main():
             return fallback
 
     indices = safe("indices", fetch_indices)
+    indices_fresh = bool(indices)  # 东财 ulist 实时成功（未用 prev/fb 兜底）
     sparks, spark_dates, amt_hist = safe("kline", fetch_index_history, ({}, [], []))
     boards = safe("boards", fetch_boards, {})
     if not boards:
@@ -1083,8 +1084,10 @@ def main():
         "history": history[-20:],
         "macro": macro,
     }
-    # A股兜底快照：仅在数据全绿时刷新，供后续失败运行取用
-    if not degraded and breadth and wl and boards:
+    # A股兜底快照：核心数据（指数实时 + breadth）成功即刷新，供后续失败运行取用。
+    # 原条件「不降级 + wl + boards」过严：东财常 502（indices/watchlist degraded），
+    # 快照曾停留 11-02（3 周），502 时用旧快照误导。放宽后至少保证指数/涨跌家数是最新。
+    if indices_fresh and breadth and (breadth.get("up", 0) + breadth.get("down", 0)) > 0:
         save_json(FALLBACK_PATH, {k: snap.get(k) for k in (
             "meta", "indices", "sparks", "breadth", "limit_up", "limit_down", "zhaban",
             "boards", "watchlist", "amount", "score", "history")})
