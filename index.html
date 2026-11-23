@@ -150,6 +150,11 @@
   .pc-now{font-family:var(--mono);font-size:13px;color:#e6eef7;margin-left:6px}
   .pc-now b{font-size:15px}
   .pc-now small{color:var(--dim);font-size:10px}
+  .rsi-block{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}
+  .rsi-h{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:4px}
+  .rsi-val{font-family:var(--mono);color:#e6eef7}
+  .rsi-val.overbought{color:#ff6b78}
+  .rsi-val.oversold{color:#0ecb81}
   .chart-tab{background:#101923;color:#8ba0b4;border:1px solid var(--line);border-radius:5px;padding:2px 9px;font-size:10.5px;cursor:pointer;font-family:var(--mono)}
   .chart-tab:hover{color:#c9d6e4;border-color:#2f4a66}
   .chart-tab.on{background:#1d2c3d;color:#ffd166;border-color:#3d5a7a;font-weight:700}
@@ -419,6 +424,10 @@
       </div>
     </div>
     <div class="chart-box" style="height:320px"><canvas id="priceChart"></canvas></div>
+    <div class="rsi-block" id="rsiBlock" hidden>
+      <div class="rsi-h"><span>RSI(14) 相对强弱</span><span class="rsi-val" id="rsiVal">—</span></div>
+      <div class="chart-box" style="height:110px"><canvas id="rsiChart"></canvas></div>
+    </div>
     <div class="cyq-meta" id="pcSummary" style="margin-top:8px">—</div>
     <div class="chart-note" id="pcNote">Y 轴为真实价格（非归一化）。数据源：Sina 全局期货日线 / Frankfurter（ECB）。</div>
   </section>
@@ -1490,6 +1499,7 @@
 
   /* ---------------- 价格走势图（单品种真实价格，Chart.js） ---------------- */
   var priceChart = null;          // Chart.js 实例
+  var rsiChartInst = null;        // RSI 副图实例
   var priceSym = "xau";           // 当前品种
   var priceRange = "10Y";         // 当前时间档
   var PRICE_META = {              // 品种 -> 标签/颜色/单位/小数位
@@ -1536,6 +1546,30 @@
     }
     var ma50  = calcMA(50);
     var ma200 = calcMA(200);
+
+    // RSI(14)：相对强弱指数，判断超买(>70)/超卖(<30)。需 ≥15 点才计算。
+    function calcRSI(n){
+      var out = new Array(allC.length).fill(null);
+      if(allC.length < n+1) return out;
+      var gain=0, loss=0;
+      // 首个平均值用前 n 个变动
+      for(var i=1;i<=n;i++){
+        var ch = allC[i]-allC[i-1];
+        if(ch>0) gain+=ch; else loss-=ch;
+      }
+      gain/=n; loss/=n;
+      out[n] = loss===0 ? 100 : 100 - 100/(1+gain/loss);
+      // 后续用 Wilder 平滑
+      for(var i=n+1;i<allC.length;i++){
+        var ch = allC[i]-allC[i-1];
+        var g = ch>0?ch:0, l = ch<0?-ch:0;
+        gain = (gain*(n-1)+g)/n;
+        loss = (loss*(n-1)+l)/n;
+        out[i] = loss===0 ? 100 : 100 - 100/(1+gain/loss);
+      }
+      return out.slice(start);
+    }
+    var rsi = calcRSI(14);
     var canvas = document.getElementById("priceChart");
     if(!canvas) return;
 
@@ -1600,6 +1634,61 @@
     };
     if(priceChart){ priceChart.destroy(); }
     priceChart = new Chart(ctx, {type:"line", data:data, options:opts});
+
+    // RSI 副图：独立小图，0-100 刻度，30/70 参考线。窗口 <20 交易日时隐藏。
+    var rsiBlock = document.getElementById("rsiBlock");
+    var rsiCanvas = document.getElementById("rsiChart");
+    if(rsiBlock && rsiCanvas && typeof Chart !== "undefined"){
+      var rsiVals = rsi.filter(function(v){ return v !== null; });
+      if(vals.length >= 20 && rsiVals.length){
+        rsiBlock.hidden = false;
+        var rsiLast = rsiVals[rsiVals.length-1];
+        var rsiCls = rsiLast >= 70 ? "overbought" : (rsiLast <= 30 ? "oversold" : "");
+        var rsiValEl = document.getElementById("rsiVal");
+        if(rsiValEl){
+          rsiValEl.textContent = rsiLast.toFixed(1) + (rsiLast>=70 ? " 超买" : rsiLast<=30 ? " 超卖" : " 中性");
+          rsiValEl.className = "rsi-val " + rsiCls;
+        }
+        var rctx = rsiCanvas.getContext("2d");
+        if(rsiChartInst){ rsiChartInst.destroy(); }
+        rsiChartInst = new Chart(rctx, {
+          type:"line",
+          data:{ labels: dates, datasets:[{
+            label:"RSI(14)", data: rsi, borderColor:"#c9a227", borderWidth:1.4,
+            pointRadius:0, tension:0.1, fill:false, spanGaps:false
+          }]},
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            interaction:{mode:"index", intersect:false},
+            plugins:{ legend:{display:false},
+              tooltip:{ callbacks:{
+                title:function(items){ var i=items[0].dataIndex; return dates[i] || ""; },
+                label:function(c){ return "RSI: " + c.parsed.y.toFixed(1); }
+              }}},
+            scales:{
+              x:{display:true, ticks:{display:true, color:"#5b6b7d", font:{family:"monospace", size:9},
+                   callback:function(v){ return (dates[v]||"").slice(2); }, maxRotation:0, autoSkip:true},
+                 grid:{display:false},
+                 afterBuildTicks:function(ax){
+                   var len=ax.getLabels().length; if(!len) return;
+                   var want=8, step=Math.max(1, Math.floor((len-1)/(want-1))); var idx=[];
+                   for(var i=0;i<len;i+=step) idx.push(i);
+                   if(idx[idx.length-1]!==len-1) idx.push(len-1);
+                   ax.ticks=idx.map(function(i){ return {value:i, label:(dates[i]||"").slice(2)}; });
+                 }},
+              y:{display:true, min:0, max:100,
+                 ticks:{color:"#8496ab", font:{family:"monospace", size:9}, stepSize:25,
+                        callback:function(v){ return v===70 ? "70 超买" : v===30 ? "30 超卖" : v; }},
+                 grid:{color:function(c){ return c.tick.value===70 ? "rgba(255,107,120,.35)"
+                       : c.tick.value===30 ? "rgba(14,203,129,.35)" : "#1a2634"; }}}
+            }
+          }
+        });
+      } else {
+        rsiBlock.hidden = true;   // 短窗口（一周/一月）点数不足，不显示 RSI
+        if(rsiChartInst){ rsiChartInst.destroy(); rsiChartInst=null; }
+      }
+    }
 
     // 更新区间说明
     var names = {"1W":"近一周","1M":"近一月","3M":"近三月","1Y":"近一年","10Y":"近十年"};
