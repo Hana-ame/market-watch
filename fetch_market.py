@@ -1018,6 +1018,10 @@ def main():
     if amt_hist:
         today_amt = amt_hist[-1]["amount"]
         prev_amt = amt_hist[-2]["amount"] if len(amt_hist) > 1 else None
+        # 合理性校验：A股两市日成交 5 万亿以上几乎必是东财 K 线 amount 字段偶发异常
+        #（曾见 6.23 万亿）。异常时不写入 today（用 None，前端显示 —，不污染 history）。
+        if today_amt and today_amt > 5e12:
+            today_amt = None
     amount = {"today": today_amt, "prev": prev_amt,
               "history": [{"date": a["date"], "amount": a["amount"]} for a in amt_hist[-20:]]}
 
