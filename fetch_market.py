@@ -965,6 +965,13 @@ def main():
     boards = safe("boards", fetch_boards, {})
     if not boards:
         boards = fb.get("boards") or {}
+    else:
+        # 部分 side 空（东财 clist 盘中偶发某 side 失败）：用 fb 补空 side，保证涨跌对称显示
+        #（曾见 industry_top/concept 空而 industry_bottom 有值，前端只显示跌的）
+        fb_boards = fb.get("boards") or {}
+        for k in ("industry_top", "industry_bottom", "concept_top", "concept_bottom"):
+            if not boards.get(k) and fb_boards.get(k):
+                boards[k] = fb_boards[k]
     breadth = safe("breadth", fetch_breadth)
     wl = safe("watchlist", fetch_watchlist, [])
     if not wl:
