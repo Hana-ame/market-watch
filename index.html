@@ -478,11 +478,11 @@
         <div class="panel-h">
           <div class="panel-t">走势（归一化）</div>
           <div class="panel-sub"><span id="chartRange">—</span>
-            <span class="chart-tabs">
-              <button class="chart-tab" data-w="10Y">十年</button>
-              <button class="chart-tab" data-w="1Y">一年</button>
-              <button class="chart-tab" data-w="1M">一月</button>
-              <button class="chart-tab" data-w="1W">一周</button>
+            <span class="chart-tabs" role="tablist" aria-label="归一化走势时间档">
+              <button class="chart-tab" data-w="10Y" role="tab" aria-selected="false">十年</button>
+              <button class="chart-tab" data-w="1Y" role="tab" aria-selected="false">一年</button>
+              <button class="chart-tab" data-w="1M" role="tab" aria-selected="false">一月</button>
+              <button class="chart-tab" data-w="1W" role="tab" aria-selected="false">一周</button>
             </span>
           </div>
         </div>
@@ -628,9 +628,9 @@
       <section class="panel">
         <div class="panel-h">
           <div class="panel-t">板块强弱</div>
-          <div style="display:flex;gap:6px">
-            <button class="navtab" style="padding:3px 10px;font-size:12px" data-btab="industry">行业</button>
-            <button class="navtab" style="padding:3px 10px;font-size:12px" data-btab="concept">概念</button>
+          <div style="display:flex;gap:6px" role="tablist" aria-label="板块分类">
+            <button class="navtab" style="padding:3px 10px;font-size:12px" data-btab="industry" role="tab" aria-selected="true">行业</button>
+            <button class="navtab" style="padding:3px 10px;font-size:12px" data-btab="concept" role="tab" aria-selected="false">概念</button>
           </div>
         </div>
         <div class="board-cols">
@@ -852,12 +852,19 @@
     const box = range.parentElement;
     if(!box) return;
     box.querySelectorAll(".chart-tab").forEach(function(b){
-      b.classList.toggle("on", b.dataset.w === chartWin);
+      var on = b.dataset.w === chartWin;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
       if(b._bound) return;
       b._bound = true;
       b.addEventListener("click", function(){
         if(chartWin === b.dataset.w) return;
         chartWin = b.dataset.w;
+        box.querySelectorAll(".chart-tab").forEach(function(x){
+          var o = x === b;
+          x.classList.toggle("on", o);
+          x.setAttribute("aria-selected", o ? "true" : "false");
+        });
         renderMacroChart();
       });
     });
@@ -1480,12 +1487,21 @@
 
     // 窗口切换标签（放在面板标题行）：切换后重画所有卡片
     var tabs = [["W","3月"],["M","半年"],["Y","1年"]];
-    var tabsHtml = '<div class="cyq-tabs">' + tabs.map(function(p){
-      return '<button class="cyq-tab' + (chipWindow===p[0] ? " on" : "") + '" data-win="' + p[0] + '">' + p[1] + '</button>';
+    var tabsHtml = '<div class="cyq-tabs" role="tablist" aria-label="筹码分布回看窗口">' + tabs.map(function(p){
+      var on = chipWindow === p[0];
+      return '<button class="cyq-tab' + (on ? " on" : "") + '" data-win="' + p[0] + '" role="tab" aria-selected="' + (on ? "true" : "false") + '">' + p[1] + '</button>';
     }).join("") + '</div>';
     $("chipSub").innerHTML = '<span>A股自选股 · 获利比例 / 平均成本 / 集中度</span>' + tabsHtml;
     $("chipSub").querySelectorAll(".cyq-tab").forEach(function(b){
-      b.addEventListener("click", function(){ chipWindow = b.dataset.win; renderChip(); });
+      b.addEventListener("click", function(){
+        chipWindow = b.dataset.win;
+        $("chipSub").querySelectorAll(".cyq-tab").forEach(function(x){
+          var o = x === b;
+          x.classList.toggle("on", o);
+          x.setAttribute("aria-selected", o ? "true" : "false");
+        });
+        renderChip();
+      });
     });
 
     box.innerHTML = "";
@@ -1971,8 +1987,12 @@
   });
   document.querySelectorAll("[data-btab]").forEach(function(t){
     t.addEventListener("click", function(){
-      document.querySelectorAll("[data-btab]").forEach(function(x){ x.classList.remove("on"); });
+      document.querySelectorAll("[data-btab]").forEach(function(x){
+        x.classList.remove("on");
+        x.setAttribute("aria-selected", "false");
+      });
       t.classList.add("on");
+      t.setAttribute("aria-selected", "true");
       boardTab = t.dataset.btab;
       renderBoards();
     });
