@@ -98,7 +98,10 @@ jobs:
           # 与 fetch_market.py 的 history 写入条件对齐：只要已收盘 + breadth 有真实涨跌
           # 家数（up+down>0）就写，不要求整体无降级（boards/news 等偶发失败不影响历史）。
           # stale（breadth 用昨收快照）仍不写，防止污染走势。
-          b = (hist[-1] if hist else {}) or {}
+          # 注意：stale/up/down 必须读 latest["breadth"]（今日实时快照），而非 hist[-1]
+          #（data/history.json 末条是已固化条目，从不带 stale 字段，用它判定恒为 None，
+          #  stale 检查会形同虚设 → breadth 抓取失败时 Persist 段不跳过，产生空提交）。
+          b = latest.get("breadth", {}) or {}
           if meta.get("state") != "已收盘":
               REASON = "state=" + str(meta.get("state"))
               print("0|" + REASON); raise SystemExit
@@ -108,7 +111,10 @@ jobs:
           if (b.get("up", 0) + b.get("down", 0)) <= 0:
               REASON = "breadth up+down<=0"
               print("0|" + REASON); raise SystemExit
-          today = hist[-1]["date"]
+          today = meta.get("trade_date") or (hist[-1]["date"] if hist else None)
+          if not today:
+              REASON = "无法确定交易日"
+              print("0|" + REASON); raise SystemExit
           try:
               old = json.loads(subprocess.check_output(["git", "show", "HEAD:data/history.json"]))
           except Exception:
