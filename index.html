@@ -413,39 +413,39 @@
     <div class="panel-h">
       <div class="panel-t">价格走势</div>
       <div class="panel-sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <div class="pc-syms" id="pcSym">
+        <div class="pc-syms" id="pcSym" role="group" aria-label="价格走势图品种选择">
           <div class="pc-group">
             <span class="pc-group-label">商品 · 外汇 · 汇率</span>
             <div class="pc-pills">
-              <button class="pc-pill" data-v="xau">黄金 XAU</button>
-              <button class="pc-pill" data-v="au0">沪金 AU0</button>
-              <button class="pc-pill" data-v="xag">白银 XAG</button>
-              <button class="pc-pill" data-v="wti">WTI 原油</button>
-              <button class="pc-pill" data-v="brent">布伦特原油</button>
-              <button class="pc-pill" data-v="usdjpy">美元/日元</button>
-              <button class="pc-pill" data-v="usdcnh">美元/人民币 CNY</button>
+              <button class="pc-pill" data-v="xau" aria-pressed="false">黄金 XAU</button>
+              <button class="pc-pill" data-v="au0" aria-pressed="false">沪金 AU0</button>
+              <button class="pc-pill" data-v="xag" aria-pressed="false">白银 XAG</button>
+              <button class="pc-pill" data-v="wti" aria-pressed="false">WTI 原油</button>
+              <button class="pc-pill" data-v="brent" aria-pressed="false">布伦特原油</button>
+              <button class="pc-pill" data-v="usdjpy" aria-pressed="false">美元/日元</button>
+              <button class="pc-pill" data-v="usdcnh" aria-pressed="false">美元/人民币 CNY</button>
             </div>
           </div>
           <div class="pc-group">
             <span class="pc-group-label">A股指数</span>
             <div class="pc-pills">
-              <button class="pc-pill" data-v="1.000001">上证指数</button>
-              <button class="pc-pill" data-v="0.399001">深证成指</button>
-              <button class="pc-pill" data-v="0.399006">创业板指</button>
-              <button class="pc-pill" data-v="1.000688">科创50</button>
-              <button class="pc-pill" data-v="1.000300">沪深300</button>
-              <button class="pc-pill" data-v="1.000905">中证500</button>
-              <button class="pc-pill" data-v="1.000852">中证1000</button>
-              <button class="pc-pill" data-v="0.899050">北证50</button>
+              <button class="pc-pill" data-v="1.000001" aria-pressed="false">上证指数</button>
+              <button class="pc-pill" data-v="0.399001" aria-pressed="false">深证成指</button>
+              <button class="pc-pill" data-v="0.399006" aria-pressed="false">创业板指</button>
+              <button class="pc-pill" data-v="1.000688" aria-pressed="false">科创50</button>
+              <button class="pc-pill" data-v="1.000300" aria-pressed="false">沪深300</button>
+              <button class="pc-pill" data-v="1.000905" aria-pressed="false">中证500</button>
+              <button class="pc-pill" data-v="1.000852" aria-pressed="false">中证1000</button>
+              <button class="pc-pill" data-v="0.899050" aria-pressed="false">北证50</button>
             </div>
           </div>
         </div>
-        <span class="chart-tabs" id="pcRange">
-          <button class="chart-tab" data-r="1W">周</button>
-          <button class="chart-tab" data-r="1M">月</button>
-          <button class="chart-tab" data-r="3M">3月</button>
-          <button class="chart-tab on" data-r="1Y">年</button>
-          <button class="chart-tab" data-r="10Y">10年</button>
+        <span class="chart-tabs" id="pcRange" role="tablist" aria-label="价格走势图时间档">
+          <button class="chart-tab" data-r="1W" role="tab" aria-selected="false">周</button>
+          <button class="chart-tab" data-r="1M" role="tab" aria-selected="false">月</button>
+          <button class="chart-tab" data-r="3M" role="tab" aria-selected="false">3月</button>
+          <button class="chart-tab on" data-r="1Y" role="tab" aria-selected="true">年</button>
+          <button class="chart-tab" data-r="10Y" role="tab" aria-selected="false">10年</button>
         </span>
         <span class="pc-now" id="pcNow">—</span>
       </div>
@@ -1576,11 +1576,15 @@
     // 同步控件显示：品种 pill 高亮恢复的品种、时间档按钮高亮恢复的档
     var _sel = document.getElementById("pcSym");
     if(_sel) _sel.querySelectorAll(".pc-pill").forEach(function(b){
-      b.classList.toggle("on", b.dataset.v === priceSym);
+      var on = b.dataset.v === priceSym;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     var _pcr = document.getElementById("pcRange");
     if(_pcr) _pcr.querySelectorAll(".chart-tab").forEach(function(b){
-      b.classList.toggle("on", b.dataset.r === priceRange);
+      var on = b.dataset.r === priceRange;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
     });
   } catch(e) {}
 
@@ -1914,7 +1918,7 @@
     b.addEventListener("click", function(){
       priceRange = b.dataset.r;
       try{ localStorage.setItem("mw_priceRange", priceRange); }catch(e){}
-      document.querySelectorAll("#pcRange .chart-tab").forEach(function(x){ x.classList.toggle("on", x === b); });
+      document.querySelectorAll("#pcRange .chart-tab").forEach(function(x){ x.classList.toggle("on", x === b); x.setAttribute("aria-selected", x === b ? "true" : "false"); });
       renderPriceChart();
     });
   });
@@ -1926,12 +1930,16 @@
       if(!b || !b.dataset.v) return;
       priceSym = b.dataset.v;
       try{ localStorage.setItem("mw_priceSym", priceSym); }catch(e){}
-      pcSymEl.querySelectorAll(".pc-pill").forEach(function(x){ x.classList.toggle("on", x === b); });
+      pcSymEl.querySelectorAll(".pc-pill").forEach(function(x){
+        var on = x === b;
+        x.classList.toggle("on", on);
+        x.setAttribute("aria-pressed", on ? "true" : "false");
+      });
       renderPriceChart();
     });
-    // 初始高亮当前品种
+    // 初始高亮当前品种（含 aria-pressed）
     var _cur = pcSymEl.querySelector('.pc-pill[data-v="' + priceSym + '"]');
-    if(_cur) _cur.classList.add("on");
+    if(_cur){ _cur.classList.add("on"); _cur.setAttribute("aria-pressed", "true"); }
   }
 
   /* ---------------- interactions ---------------- */
