@@ -495,13 +495,24 @@ def fetch_breadth():
                 return ((d.get("data") or {}).get("diff") or [])
             except Exception:  # noqa: BLE001
                 time.sleep(1.2 * (attempt + 1))
-        return []
+        return None          # 明确标记「该页重试全失败」，区别于「抓到但为空」
 
     rows = list((first.get("data") or {}).get("diff") or [])
+    failed_pages = []
     if pages > 1:
         with ThreadPoolExecutor(6) as ex:
-            for chunk in ex.map(page, range(2, pages + 1)):
-                rows.extend(chunk)
+            for pn, chunk in zip(range(2, pages + 1), ex.map(page, range(2, pages + 1))):
+                if chunk is None:
+                    failed_pages.append(pn)   # 记录失败页，稍后定向重试
+                else:
+                    rows.extend(chunk)
+
+    # 定向二次重试：并发抢页时个别页被东财限流，单线程慢速重抓往往能补回，
+    # 避免「少数页失败 → 整体不足 90% → 回退昨收快照」丢失当天真实涨跌。
+    for pn in failed_pages:
+        chunk = page(pn)
+        if chunk:
+            rows.extend(chunk)
 
     pcts, amount, valid = [], 0.0, 0
     for x in rows:
