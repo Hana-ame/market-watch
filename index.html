@@ -1954,9 +1954,19 @@
       var tab = t.dataset.tab;
       ["macro", "metals", "ashare"].forEach(function(k){ $("tab-" + k).hidden = (k !== tab); });
     });
-    // 键盘导航：Enter/Space 激活 tab（可访问性）
+    // 键盘导航：Enter/Space 激活；←/→（/↑/↓）在主导航 tab 间移动焦点并激活
+    // （WAI-ARIA tabs 模式：tablist 内方向键循环切换，焦点跟随激活项）
     t.addEventListener("keydown", function(e){
-      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); t.click(); }
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); t.click(); return; }
+      if(e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown"){
+        e.preventDefault();
+        var tabs = Array.prototype.slice.call(document.querySelectorAll(".navtab[data-tab]"));
+        var i = tabs.indexOf(t);
+        if(i < 0) return;
+        var dir = (e.key === "ArrowRight" || e.key === "ArrowDown") ? 1 : -1;
+        var next = tabs[(i + dir + tabs.length) % tabs.length];
+        if(next){ next.focus(); next.click(); }
+      }
     });
   });
   document.querySelectorAll("[data-btab]").forEach(function(t){
