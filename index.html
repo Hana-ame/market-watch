@@ -1573,9 +1573,11 @@
     var _pr = localStorage.getItem("mw_priceRange");
     if(_ps && PRICE_META[_ps]) priceSym = _ps;
     if(_pr && PRICE_SLICE[_pr]) priceRange = _pr;
-    // 同步控件显示：下拉框选回恢复的品种、时间档按钮高亮恢复的档
+    // 同步控件显示：品种 pill 高亮恢复的品种、时间档按钮高亮恢复的档
     var _sel = document.getElementById("pcSym");
-    if(_sel) _sel.value = priceSym;
+    if(_sel) _sel.querySelectorAll(".pc-pill").forEach(function(b){
+      b.classList.toggle("on", b.dataset.v === priceSym);
+    });
     var _pcr = document.getElementById("pcRange");
     if(_pcr) _pcr.querySelectorAll(".chart-tab").forEach(function(b){
       b.classList.toggle("on", b.dataset.r === priceRange);
@@ -1916,11 +1918,18 @@
   });
   var pcSymEl = document.getElementById("pcSym");
   if(pcSymEl){
-    pcSymEl.addEventListener("change", function(){
-      priceSym = pcSymEl.value;
+    // 品种 pills：点击 data-v 按钮切换品种（容器为 DIV，用事件委托）
+    pcSymEl.addEventListener("click", function(e){
+      var b = e.target.closest ? e.target.closest(".pc-pill") : null;
+      if(!b || !b.dataset.v) return;
+      priceSym = b.dataset.v;
       try{ localStorage.setItem("mw_priceSym", priceSym); }catch(e){}
+      pcSymEl.querySelectorAll(".pc-pill").forEach(function(x){ x.classList.toggle("on", x === b); });
       renderPriceChart();
     });
+    // 初始高亮当前品种
+    var _cur = pcSymEl.querySelector('.pc-pill[data-v="' + priceSym + '"]');
+    if(_cur) _cur.classList.add("on");
   }
 
   /* ---------------- interactions ---------------- */
