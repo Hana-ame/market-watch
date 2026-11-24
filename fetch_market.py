@@ -371,7 +371,9 @@ def fetch_index_history():
     # 东财被封时走腾讯兜底 fetch_kline）。sparks 迷你图只用末 30 点。
     sparks = {secid: [r["close"] for r in rows[-30:]] for secid, rows in res.items()}
     idx_hist = {secid: {"d": [r["date"] for r in rows if r.get("close")],
-                        "c": [r["close"] for r in rows if r.get("close")]}
+                        "c": [r["close"] for r in rows if r.get("close")],
+                        # 成交量（手/股）：仅腾讯 A 股指数有；Sina 期货/ECB 外汇为 None
+                        "v": [r.get("volume") for r in rows if r.get("close")]}
                 for secid, rows in res.items()}
     dates = [r["date"] for r in res.get("1.000001", [])][-30:]
     sh = {r["date"]: r for r in res.get("1.000001", [])}
