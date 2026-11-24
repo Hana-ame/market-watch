@@ -507,12 +507,20 @@ def fetch_breadth():
                 else:
                     rows.extend(chunk)
 
-    # 定向二次重试：并发抢页时个别页被东财限流，单线程慢速重抓往往能补回，
-    # 避免「少数页失败 → 整体不足 90% → 回退昨收快照」丢失当天真实涨跌。
-    for pn in failed_pages:
-        chunk = page(pn)
-        if chunk:
-            rows.extend(chunk)
+    # 定向多轮重试：并发抢页时个别页被东财限流，单线程慢速重抓往往能补回。
+    # 上限 3 轮：每轮只重抓上一轮仍失败的页（限流页通常间隔后能恢复），避免无谓打满请求。
+    pending = failed_pages
+    for _ in range(2):                      # 首轮定向已含 1 次 → 最多再补 2 轮
+        if not pending:
+            break
+        still = []
+        for pn in pending:
+            chunk = page(pn)
+            if chunk:
+                rows.extend(chunk)
+            else:
+                still.append(pn)
+        pending = still
 
     pcts, amount, valid = [], 0.0, 0
     for x in rows:
